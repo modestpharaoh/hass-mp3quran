@@ -1,0 +1,48 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MP3 Quran",
+        "description": "Browse Quran recitations from mp3quran.net in the Home Assistant media browser.",
+        "data": {
+          "sort_language": "Sort reciters by",
+          "auto_advance": "Auto-play next surah",
+          "surah_repeat": "Repeat each surah"
+        },
+        "data_description": {
+          "sort_language": "Language used to sort the reciter list.",
+          "auto_advance": "When enabled, advance to the next surah after the current one finishes.",
+          "surah_repeat": "How many times to play each surah before advancing (1-20)."
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only a single MP3 Quran configuration is allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "MP3 Quran options",
+        "data": {
+          "sort_language": "Sort reciters by",
+          "auto_advance": "Auto-play next surah",
+          "surah_repeat": "Repeat each surah"
+        },
+        "data_description": {
+          "sort_language": "Language used to sort the reciter list.",
+          "auto_advance": "When enabled, advance to the next surah after the current one finishes.",
+          "surah_repeat": "How many times to play each surah before advancing (1-20)."
+        }
+      }
+    }
+  },
+  "selector": {
+    "sort_language": {
+      "options": {
+        "english": "English name",
+        "arabic": "Arabic name"
+      }
+    }
+  }
+}

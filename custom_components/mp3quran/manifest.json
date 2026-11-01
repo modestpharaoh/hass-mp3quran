@@ -1,0 +1,14 @@
+{
+  "domain": "mp3quran",
+  "name": "MP3 Quran",
+  "codeowners": ["@modestpharaoh"],
+  "config_flow": true,
+  "dependencies": ["media_source"],
+  "documentation": "https://github.com/modestpharaoh/hass-mp3quran",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/modestpharaoh/hass-mp3quran/issues",
+  "loggers": ["custom_components.mp3quran"],
+  "requirements": [],
+  "version": "1.0.0"
+}

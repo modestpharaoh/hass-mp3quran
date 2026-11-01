@@ -1,0 +1,66 @@
+play:
+  name: Play Quran
+  description: Play a surah on a media player with optional auto-advance and repeat.
+  fields:
+    entity_id:
+      name: Media player
+      description: Target media player entity.
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
+    reciter_id:
+      name: Reciter ID
+      description: Numeric reciter id from mp3quran.net.
+      required: true
+      selector:
+        number:
+          min: 1
+          mode: box
+    moshaf_id:
+      name: Moshaf ID
+      description: Optional moshaf/riwayah id. Defaults to the first moshaf for the reciter.
+      required: false
+      selector:
+        number:
+          min: 1
+          mode: box
+    surah:
+      name: Surah
+      description: Surah number to start from (1-114).
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 114
+          mode: box
+    auto_advance:
+      name: Auto-advance
+      description: Play the next surah when the current one finishes. Defaults to the integration option.
+      required: false
+      selector:
+        boolean:
+    surah_repeat:
+      name: Surah repeat
+      description: How many times to play each surah before advancing (1-20).
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 20
+          mode: box
+
+stop:
+  name: Stop Quran session
+  description: Stop continuous playback session tracking for a media player.
+  fields:
+    entity_id:
+      name: Media player
+      description: Media player entity whose session should be cleared.
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          multiple: true
