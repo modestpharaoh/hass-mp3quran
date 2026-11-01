@@ -15,13 +15,12 @@ from homeassistant.core import HomeAssistant
 
 from .api import Catalog, Moshaf, Reciter
 from .const import (
-    CONF_SORT_LANGUAGE,
-    DEFAULT_SORT_LANGUAGE,
     DOMAIN,
     ID_MOSHAF,
     ID_RECITER,
     ID_SURAH,
     MIME_TYPE_MP3,
+    get_display_language,
 )
 from .coordinator import Mp3QuranCoordinator
 
@@ -57,8 +56,8 @@ class Mp3QuranMediaSource(MediaSource):
             raise BrowseError("MP3 Quran catalog is not ready")
         return self.coordinator.data
 
-    def _sort_language(self) -> str:
-        return self.entry.options.get(CONF_SORT_LANGUAGE, DEFAULT_SORT_LANGUAGE)
+    def _display_language(self) -> str:
+        return get_display_language(self.entry.options)
 
     async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
         """Resolve a surah identifier to a streaming URL."""
@@ -95,9 +94,10 @@ class Mp3QuranMediaSource(MediaSource):
 
         catalog = self.catalog
         identifier = item.identifier or ""
+        language = self._display_language()
 
         if not identifier:
-            return self._browse_root(catalog)
+            return self._browse_root(catalog, language)
 
         parsed = _parse_identifier(identifier)
         if parsed is None:
@@ -113,27 +113,27 @@ class Mp3QuranMediaSource(MediaSource):
 
         if moshaf_id is None:
             if len(reciter.moshafs) == 1:
-                return self._browse_surahs(catalog, reciter, reciter.moshafs[0])
-            return self._browse_moshafs(reciter)
+                return self._browse_surahs(catalog, reciter, reciter.moshafs[0], language)
+            return self._browse_moshafs(reciter, language)
 
         moshaf = reciter.get_moshaf(moshaf_id)
         if moshaf is None:
             raise BrowseError(f"Unknown moshaf: {moshaf_id}")
-        return self._browse_surahs(catalog, reciter, moshaf)
+        return self._browse_surahs(catalog, reciter, moshaf, language)
 
-    def _browse_root(self, catalog: Catalog) -> BrowseMediaSource:
+    def _browse_root(self, catalog: Catalog, language: str) -> BrowseMediaSource:
         children = [
             BrowseMediaSource(
                 domain=DOMAIN,
                 identifier=f"{ID_RECITER}/{reciter.id}",
                 media_class=MediaClass.DIRECTORY,
                 media_content_type=MediaType.MUSIC,
-                title=reciter.display_name,
+                title=reciter.browse_title(language),
                 can_play=False,
                 can_expand=True,
                 children_media_class=MediaClass.DIRECTORY,
             )
-            for reciter in catalog.sorted_reciters(self._sort_language())
+            for reciter in catalog.sorted_reciters(language)
         ]
         return BrowseMediaSource(
             domain=DOMAIN,
@@ -147,14 +147,14 @@ class Mp3QuranMediaSource(MediaSource):
             children=children,
         )
 
-    def _browse_moshafs(self, reciter: Reciter) -> BrowseMediaSource:
+    def _browse_moshafs(self, reciter: Reciter, language: str) -> BrowseMediaSource:
         children = [
             BrowseMediaSource(
                 domain=DOMAIN,
                 identifier=f"{ID_RECITER}/{reciter.id}/{ID_MOSHAF}/{moshaf.id}",
                 media_class=MediaClass.DIRECTORY,
                 media_content_type=MediaType.MUSIC,
-                title=moshaf.display_name,
+                title=moshaf.browse_title(language),
                 can_play=False,
                 can_expand=True,
                 children_media_class=MediaClass.TRACK,
@@ -166,7 +166,7 @@ class Mp3QuranMediaSource(MediaSource):
             identifier=f"{ID_RECITER}/{reciter.id}",
             media_class=MediaClass.DIRECTORY,
             media_content_type=MediaType.MUSIC,
-            title=reciter.display_name,
+            title=reciter.browse_title(language),
             can_play=False,
             can_expand=True,
             children_media_class=MediaClass.DIRECTORY,
@@ -178,11 +178,14 @@ class Mp3QuranMediaSource(MediaSource):
         catalog: Catalog,
         reciter: Reciter,
         moshaf: Moshaf,
+        language: str,
     ) -> BrowseMediaSource:
         children: list[BrowseMediaSource] = []
         for surah_num in moshaf.surah_list:
             info = catalog.surahs.get(surah_num)
-            title = info.display_title() if info else f"{surah_num:03d}"
+            title = (
+                info.display_title(language) if info else f"{surah_num:03d}"
+            )
             children.append(
                 BrowseMediaSource(
                     domain=DOMAIN,
@@ -204,9 +207,9 @@ class Mp3QuranMediaSource(MediaSource):
             else f"{ID_RECITER}/{reciter.id}/{ID_MOSHAF}/{moshaf.id}"
         )
         title = (
-            reciter.display_name
+            reciter.browse_title(language)
             if len(reciter.moshafs) == 1
-            else f"{reciter.display_name} · {moshaf.display_name}"
+            else f"{reciter.browse_title(language)} · {moshaf.browse_title(language)}"
         )
         return BrowseMediaSource(
             domain=DOMAIN,

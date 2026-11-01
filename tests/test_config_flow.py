@@ -7,12 +7,13 @@ import pytest
 from custom_components.mp3quran.config_flow import Mp3QuranConfigFlow
 from custom_components.mp3quran.const import (
     CONF_AUTO_ADVANCE,
-    CONF_SORT_LANGUAGE,
+    CONF_DISPLAY_LANGUAGE,
     CONF_SURAH_REPEAT,
     DEFAULT_AUTO_ADVANCE,
-    DEFAULT_SORT_LANGUAGE,
+    DEFAULT_DISPLAY_LANGUAGE,
     DEFAULT_SURAH_REPEAT,
     DOMAIN,
+    get_display_language,
 )
 
 
@@ -27,7 +28,7 @@ async def test_user_step_creates_entry() -> None:
 
     result = await flow.async_step_user(
         {
-            CONF_SORT_LANGUAGE: "arabic",
+            CONF_DISPLAY_LANGUAGE: "arabic",
             CONF_AUTO_ADVANCE: False,
             CONF_SURAH_REPEAT: 3,
         }
@@ -35,7 +36,7 @@ async def test_user_step_creates_entry() -> None:
     assert result["type"] == "create_entry"
     assert result["title"] == "MP3 Quran"
     assert result["data"] == {}
-    assert result["options"][CONF_SORT_LANGUAGE] == "arabic"
+    assert result["options"][CONF_DISPLAY_LANGUAGE] == "arabic"
     assert result["options"][CONF_AUTO_ADVANCE] is False
     assert result["options"][CONF_SURAH_REPEAT] == 3
 
@@ -54,7 +55,13 @@ async def test_defaults_on_empty_submit() -> None:
     flow = Mp3QuranConfigFlow()
     result = await flow.async_step_user({})
     assert result["type"] == "create_entry"
-    assert result["options"][CONF_SORT_LANGUAGE] == DEFAULT_SORT_LANGUAGE
+    assert result["options"][CONF_DISPLAY_LANGUAGE] == DEFAULT_DISPLAY_LANGUAGE
     assert result["options"][CONF_AUTO_ADVANCE] == DEFAULT_AUTO_ADVANCE
     assert result["options"][CONF_SURAH_REPEAT] == DEFAULT_SURAH_REPEAT
     assert DOMAIN == "mp3quran"
+
+
+def test_legacy_sort_language_option() -> None:
+    assert get_display_language({"sort_language": "arabic"}) == "arabic"
+    assert get_display_language({"display_language": "english"}) == "english"
+    assert get_display_language({}) == DEFAULT_DISPLAY_LANGUAGE

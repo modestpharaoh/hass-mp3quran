@@ -185,6 +185,19 @@ def _ensure_ha_stubs() -> None:
     ha_aiohttp.async_get_clientsession = MagicMock()
     sys.modules["homeassistant.helpers.aiohttp_client"] = ha_aiohttp
 
+    ha_service = types.ModuleType("homeassistant.helpers.service")
+
+    async def async_extract_entity_ids(hass, call):
+        raw = (call.data or {}).get("entity_id")
+        if not raw:
+            return set()
+        if isinstance(raw, str):
+            return {raw}
+        return set(raw)
+
+    ha_service.async_extract_entity_ids = async_extract_entity_ids
+    sys.modules["homeassistant.helpers.service"] = ha_service
+
     ha_uc = types.ModuleType("homeassistant.helpers.update_coordinator")
 
     class UpdateFailed(Exception):

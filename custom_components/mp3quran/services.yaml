@@ -1,18 +1,13 @@
 play:
   name: Play Quran
   description: Play a surah on a media player with optional auto-advance and repeat.
+  target:
+    entity:
+      domain: media_player
   fields:
-    entity_id:
-      name: Media player
-      description: Target media player entity.
-      required: true
-      selector:
-        entity:
-          domain: media_player
-          multiple: true
     reciter_id:
       name: Reciter ID
-      description: Numeric reciter id from mp3quran.net.
+      description: Numeric reciter id from mp3quran.net (shown in Media Browser as [id]).
       required: true
       selector:
         number:
@@ -20,7 +15,7 @@ play:
           mode: box
     moshaf_id:
       name: Moshaf ID
-      description: Optional moshaf/riwayah id. Defaults to the first moshaf for the reciter.
+      description: Optional moshaf/riwayah id (shown in Media Browser as [id]). Defaults to the first moshaf for the reciter.
       required: false
       selector:
         number:
@@ -55,12 +50,6 @@ play:
 stop:
   name: Stop Quran session
   description: Stop continuous playback session tracking for a media player.
-  fields:
-    entity_id:
-      name: Media player
-      description: Media player entity whose session should be cleared.
-      required: true
-      selector:
-        entity:
-          domain: media_player
-          multiple: true
+  target:
+    entity:
+      domain: media_player

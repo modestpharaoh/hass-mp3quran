@@ -34,10 +34,15 @@ def test_merge_suwar_from_api(load_fixture) -> None:
     assert "Fatihah" in merged[1].name_en or "fatihah" in merged[1].name_en.lower()
     assert merged[1].name_ar
     assert merged[1].ayah_count == 7
-    title = merged[1].display_title()
+    title = merged[1].display_title("english")
     assert "001" in title
     assert "Makki" in title
     assert "7 ayahs" in title
+    assert "الفاتحة" not in title
+    ar_title = merged[1].display_title("arabic")
+    assert "الفاتحة" in ar_title
+    assert "مكية" in ar_title
+    assert "آية" in ar_title
 
 
 def test_moshaf_audio_url_and_next() -> None:
@@ -91,12 +96,16 @@ def test_catalog_sort_and_find(load_fixture) -> None:
     by_en = catalog.sorted_reciters("english")
     by_ar = catalog.sorted_reciters("arabic")
     assert {r.id for r in by_en} == {1, 102}
-    assert by_en[0].display_name
-    assert "·" in by_en[0].display_name
-
-    # Incomplete moshaf only has listed surahs
+    assert by_en[0].browse_title("english").endswith(f"[{by_en[0].id}]")
+    assert "[" in by_ar[0].browse_title("arabic")
     maher = catalog.get_reciter(102)
     assert maher is not None
+    assert maher.browse_title("english") == f"{maher.name_en} [102]"
+    assert maher.moshafs[0].browse_title("english").endswith(
+        f"[{maher.moshafs[0].id}]"
+    )
+
+    # Incomplete moshaf only has listed surahs
     assert len(maher.moshafs) == 3
     incomplete = next(m for m in maher.moshafs if m.surah_total == 38)
     assert incomplete.has_surah(1)

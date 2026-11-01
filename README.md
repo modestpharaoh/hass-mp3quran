@@ -10,9 +10,9 @@ Play any of the 114 surahs by many reciters on any media player (VLC, Cast, brow
 
 - **Media source** — appears in **Media** as **MP3 Quran**
 - **Live catalog** — reciters and moshafs loaded from the mp3quran.net API on setup/reload
-- **Bilingual UI** — English and Arabic names for reciters, moshafs, and surahs
-- **Sort options** — sort reciters by English or Arabic name
-- **Surah details** — number, EN/AR name, Makki/Madani, ayah count
+- **Display language** — show and sort reciter / moshaf / surah names in English or Arabic
+- **IDs in Media Browser** — reciter and moshaf titles include their mp3quran.net IDs for easy service calls
+- **Surah details** — number, localized name, Makki/Madani, ayah count
 - **Incomplete moshafs** — only available surahs are listed
 - **Continuous playback** — optional auto-advance to the next surah
 - **Surah repeat** — play each surah N times before advancing
@@ -35,9 +35,12 @@ Play any of the 114 surahs by many reciters on any media player (VLC, Cast, brow
 3. Pick a reciter (then a moshaf if the reciter has more than one)
 4. Pick a surah and send it to any media player
 
-Surah titles look like:
+Examples:
 
-`001 · Al-Fatihah · الفاتحة · Makki · 7 ayahs`
+- Reciter: `Maher Al Meaqli [102]`
+- Moshaf: `Murattal [102]`
+- Surah (English): `001 · Al-Fatihah · Makki · 7 ayahs`
+- Surah (Arabic): `001 · الفاتحة · مكية · 7 آية`
 
 ### Options
 
@@ -45,7 +48,7 @@ Configure under the integration’s **Configure** menu:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| Sort reciters by | `english` or `arabic` | english |
+| Display language | `english` or `arabic` (names + sort order) | english |
 | Auto-play next surah | Advance when the current surah ends | on |
 | Repeat each surah | Times to play each surah before advancing (1–20) | 1 |
 
