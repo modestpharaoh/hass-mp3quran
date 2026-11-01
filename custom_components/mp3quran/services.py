@@ -8,6 +8,7 @@ from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.service import async_extract_entity_ids
 
 from .const import (
     ATTR_AUTO_ADVANCE,
@@ -28,6 +29,8 @@ from .const import (
 from .coordinator import Mp3QuranCoordinator
 from .session import PlaybackSessionManager
 
+# entity_id is provided by the service target picker; keep it in the schema so
+# both UI target selection and YAML entity_id still validate.
 PLAY_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
@@ -57,6 +60,21 @@ def async_register_services(
     sessions: PlaybackSessionManager,
 ) -> None:
     """Register domain services once."""
+
+    async def _entity_ids(call: ServiceCall) -> list[str]:
+        """Resolve target/entity_id from the service call."""
+        try:
+            extracted = await async_extract_entity_ids(hass, call)
+        except Exception:  # noqa: BLE001 - fall back for lightweight test stubs
+            extracted = set()
+        if extracted:
+            return sorted(extracted)
+        raw = call.data.get(ATTR_ENTITY_ID)
+        if not raw:
+            raise HomeAssistantError("No media player target selected")
+        if isinstance(raw, str):
+            return [raw]
+        return list(raw)
 
     async def async_handle_play(call: ServiceCall) -> None:
         """Start continuous playback on one or more media players."""
@@ -94,7 +112,7 @@ def async_register_services(
             options.get(CONF_SURAH_REPEAT, DEFAULT_SURAH_REPEAT),
         )
 
-        for entity_id in call.data[ATTR_ENTITY_ID]:
+        for entity_id in await _entity_ids(call):
             await sessions.async_start(
                 entity_id,
                 reciter,
@@ -106,7 +124,7 @@ def async_register_services(
 
     async def async_handle_stop(call: ServiceCall) -> None:
         """Stop continuous playback sessions."""
-        for entity_id in call.data[ATTR_ENTITY_ID]:
+        for entity_id in await _entity_ids(call):
             sessions.stop(entity_id)
 
     if not hass.services.has_service(DOMAIN, SERVICE_PLAY):

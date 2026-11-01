@@ -46,12 +46,20 @@ class Moshaf:
                 return candidate
         return None
 
+    def localized_name(self, language: str = "english") -> str:
+        """Return the moshaf name in the requested language."""
+        if language == "arabic":
+            return self.name_ar or self.name_en
+        return self.name_en or self.name_ar
+
+    def browse_title(self, language: str = "english") -> str:
+        """Return media-browser title including the mp3quran moshaf id."""
+        return f"{self.localized_name(language)} [{self.id}]"
+
     @property
     def display_name(self) -> str:
-        """Bilingual moshaf title."""
-        if self.name_ar and self.name_ar != self.name_en:
-            return f"{self.name_en} · {self.name_ar}"
-        return self.name_en
+        """Default English browse title with id."""
+        return self.browse_title("english")
 
 
 @dataclass(slots=True)
@@ -64,12 +72,20 @@ class Reciter:
     letter: str = ""
     moshafs: list[Moshaf] = field(default_factory=list)
 
+    def localized_name(self, language: str = "english") -> str:
+        """Return the reciter name in the requested language."""
+        if language == "arabic":
+            return self.name_ar or self.name_en
+        return self.name_en or self.name_ar
+
+    def browse_title(self, language: str = "english") -> str:
+        """Return media-browser title including the mp3quran reciter id."""
+        return f"{self.localized_name(language)} [{self.id}]"
+
     @property
     def display_name(self) -> str:
-        """Bilingual reciter title."""
-        if self.name_ar and self.name_ar != self.name_en:
-            return f"{self.name_en} · {self.name_ar}"
-        return self.name_en
+        """Default English browse title with id."""
+        return self.browse_title("english")
 
     def get_moshaf(self, moshaf_id: int) -> Moshaf | None:
         """Return a moshaf by id."""

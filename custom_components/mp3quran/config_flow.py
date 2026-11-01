@@ -24,15 +24,16 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_AUTO_ADVANCE,
-    CONF_SORT_LANGUAGE,
+    CONF_DISPLAY_LANGUAGE,
     CONF_SURAH_REPEAT,
     DEFAULT_AUTO_ADVANCE,
-    DEFAULT_SORT_LANGUAGE,
+    DEFAULT_DISPLAY_LANGUAGE,
     DEFAULT_SURAH_REPEAT,
+    DISPLAY_LANGUAGES,
     DOMAIN,
     MAX_SURAH_REPEAT,
     MIN_SURAH_REPEAT,
-    SORT_LANGUAGES,
+    get_display_language,
 )
 
 
@@ -41,13 +42,13 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(
-                CONF_SORT_LANGUAGE,
-                default=defaults.get(CONF_SORT_LANGUAGE, DEFAULT_SORT_LANGUAGE),
+                CONF_DISPLAY_LANGUAGE,
+                default=get_display_language(defaults),
             ): SelectSelector(
                 SelectSelectorConfig(
-                    options=SORT_LANGUAGES,
+                    options=DISPLAY_LANGUAGES,
                     mode=SelectSelectorMode.DROPDOWN,
-                    translation_key=CONF_SORT_LANGUAGE,
+                    translation_key=CONF_DISPLAY_LANGUAGE,
                 )
             ),
             vol.Required(
@@ -86,8 +87,8 @@ class Mp3QuranConfigFlow(ConfigFlow, domain=DOMAIN):
                 title="MP3 Quran",
                 data={},
                 options={
-                    CONF_SORT_LANGUAGE: user_input.get(
-                        CONF_SORT_LANGUAGE, DEFAULT_SORT_LANGUAGE
+                    CONF_DISPLAY_LANGUAGE: user_input.get(
+                        CONF_DISPLAY_LANGUAGE, DEFAULT_DISPLAY_LANGUAGE
                     ),
                     CONF_AUTO_ADVANCE: user_input.get(
                         CONF_AUTO_ADVANCE, DEFAULT_AUTO_ADVANCE
@@ -102,7 +103,7 @@ class Mp3QuranConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=_options_schema(
                 {
-                    CONF_SORT_LANGUAGE: DEFAULT_SORT_LANGUAGE,
+                    CONF_DISPLAY_LANGUAGE: DEFAULT_DISPLAY_LANGUAGE,
                     CONF_AUTO_ADVANCE: DEFAULT_AUTO_ADVANCE,
                     CONF_SURAH_REPEAT: DEFAULT_SURAH_REPEAT,
                 }
@@ -127,7 +128,7 @@ class Mp3QuranOptionsFlowHandler(OptionsFlow):
             return self.async_create_entry(
                 title="",
                 data={
-                    CONF_SORT_LANGUAGE: user_input[CONF_SORT_LANGUAGE],
+                    CONF_DISPLAY_LANGUAGE: user_input[CONF_DISPLAY_LANGUAGE],
                     CONF_AUTO_ADVANCE: user_input[CONF_AUTO_ADVANCE],
                     CONF_SURAH_REPEAT: int(user_input[CONF_SURAH_REPEAT]),
                 },

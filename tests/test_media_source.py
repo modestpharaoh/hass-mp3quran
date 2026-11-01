@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from custom_components.mp3quran.api import Catalog, Moshaf, Reciter
-from custom_components.mp3quran.const import DOMAIN, MIME_TYPE_MP3
+from custom_components.mp3quran.const import MIME_TYPE_MP3
 from custom_components.mp3quran.media_source import (
     Mp3QuranMediaSource,
     _parse_identifier,
@@ -63,11 +63,13 @@ def _catalog() -> Catalog:
     )
 
 
-def _source(catalog: Catalog, sort_language: str = "english") -> Mp3QuranMediaSource:
+def _source(
+    catalog: Catalog, display_language: str = "english"
+) -> Mp3QuranMediaSource:
     entry = MagicMock()
     entry.title = "MP3 Quran"
     entry.state = ConfigEntryState.LOADED
-    entry.options = {"sort_language": sort_language}
+    entry.options = {"display_language": display_language}
     coordinator = MagicMock()
     coordinator.data = catalog
     entry.runtime_data = SimpleNamespace(coordinator=coordinator)
@@ -86,14 +88,26 @@ def test_parse_identifier() -> None:
 
 
 @pytest.mark.asyncio
-async def test_browse_root_sorted() -> None:
-    source = _source(_catalog(), sort_language="english")
+async def test_browse_root_sorted_english_with_ids() -> None:
+    source = _source(_catalog(), display_language="english")
     root = await source.async_browse_media(MediaSourceItem(None))
     assert root.can_expand is True
     assert len(root.children) == 2
     titles = [child.title for child in root.children]
     assert titles == sorted(titles, key=str.casefold)
-    assert "·" in titles[0]
+    assert "[1]" in titles[0] or "[102]" in titles[0]
+    assert all("[" in title for title in titles)
+    assert all("ماهر" not in title for title in titles)
+
+
+@pytest.mark.asyncio
+async def test_browse_root_arabic_names() -> None:
+    source = _source(_catalog(), display_language="arabic")
+    root = await source.async_browse_media(MediaSourceItem(None))
+    titles = [child.title for child in root.children]
+    assert any("ماهر المعيقلي" in title for title in titles)
+    assert any("إبراهيم الأخضر" in title for title in titles)
+    assert all("[" in title for title in titles)
 
 
 @pytest.mark.asyncio
@@ -104,16 +118,18 @@ async def test_browse_single_moshaf_goes_to_surahs() -> None:
     assert page.children[0].can_play is True
     assert "001" in page.children[0].title
     assert "Al-Fatihah" in page.children[0].title
-    assert "الفاتحة" in page.children[0].title
+    assert "الفاتحة" not in page.children[0].title
     assert len(page.children) == 114
 
 
 @pytest.mark.asyncio
-async def test_browse_multi_moshaf_then_incomplete() -> None:
+async def test_browse_multi_moshaf_shows_ids() -> None:
     source = _source(_catalog())
     moshafs = await source.async_browse_media(MediaSourceItem("reciter/102"))
     assert len(moshafs.children) == 2
     assert all(child.can_expand for child in moshafs.children)
+    assert any("[102]" in child.title for child in moshafs.children)
+    assert any("[103]" in child.title for child in moshafs.children)
 
     surahs = await source.async_browse_media(
         MediaSourceItem("reciter/102/moshaf/103")

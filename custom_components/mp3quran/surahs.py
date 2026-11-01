@@ -30,10 +30,21 @@ class SurahInfo:
         """Return Arabic revelation label."""
         return "مكية" if self.makki else "مدنية"
 
-    def display_title(self) -> str:
-        """Return bilingual browse title."""
+    def localized_name(self, language: str = "english") -> str:
+        """Return the surah name in the requested language."""
+        if language == "arabic":
+            return self.name_ar or self.name_en
+        return self.name_en or self.name_ar
+
+    def display_title(self, language: str = "english") -> str:
+        """Return localized browse title with revelation type and ayah count."""
+        if language == "arabic":
+            return (
+                f"{self.number:03d} · {self.localized_name('arabic')} · "
+                f"{self.revelation_ar} · {self.ayah_count} آية"
+            )
         return (
-            f"{self.number:03d} · {self.name_en} · {self.name_ar} · "
+            f"{self.number:03d} · {self.localized_name('english')} · "
             f"{self.revelation} · {self.ayah_count} ayahs"
         )
 
