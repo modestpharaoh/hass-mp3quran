@@ -1,5 +1,6 @@
 const ROOT_ID = "media-source://mp3quran";
 const BRAND_ICON = "/mp3quran_brand/icon.png";
+const SEEK = 2;
 const VOLUME_SET = 4;
 const VOLUME_STEP = 1024;
 
@@ -26,6 +27,8 @@ const STRINGS = {
     paused: "Paused",
     volumeDown: "Volume down",
     volumeUp: "Volume up",
+    progress: "Track progress",
+    seek: "Seek",
   },
   ar: {
     dir: "rtl",
@@ -49,6 +52,8 @@ const STRINGS = {
     paused: "متوقف مؤقتاً",
     volumeDown: "خفض الصوت",
     volumeUp: "رفع الصوت",
+    progress: "تقدم المقطع",
+    seek: "تقديم",
   },
 };
 
@@ -111,6 +116,36 @@ function sessionFor(hass, entityId) {
     }
   }
   return null;
+}
+
+function trackProgress(state) {
+  if (!state || !state.attributes) return null;
+  if (state.state !== "playing" && state.state !== "paused" && state.state !== "buffering") {
+    return null;
+  }
+  const attrs = state.attributes;
+  if (attrs.media_duration == null || attrs.media_position == null) return null;
+  const duration = Number(attrs.media_duration);
+  let position = Number(attrs.media_position);
+  if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(position)) return null;
+  if (state.state === "playing" && attrs.media_position_updated_at) {
+    const updated = Date.parse(attrs.media_position_updated_at);
+    if (Number.isFinite(updated)) {
+      position += Math.max(0, (Date.now() - updated) / 1000);
+    }
+  }
+  position = Math.min(duration, Math.max(0, position));
+  return { position, duration };
+}
+
+function formatClock(seconds) {
+  const total = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  const padded = String(secs).padStart(2, "0");
+  if (hours) return `${hours}:${String(minutes).padStart(2, "0")}:${padded}`;
+  return `${minutes}:${padded}`;
 }
 
 function mediaPlayers(hass) {
@@ -217,6 +252,45 @@ const STYLE = `
     background: rgba(255, 255, 255, 0.16);
   }
   .state-pill[hidden] { display: none; }
+  .progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .progress[hidden] { display: none; }
+  .progress .time {
+    flex: 0 0 auto;
+    min-width: 2.4em;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.9;
+    white-space: nowrap;
+  }
+  .progress .time.end { text-align: end; }
+  .progress .track {
+    flex: 1;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    overflow: hidden;
+  }
+  .progress .fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: #7ad3ef;
+  }
+  .progress .seek {
+    flex: 1;
+    height: 16px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    accent-color: #7ad3ef;
+    cursor: pointer;
+    background: transparent;
+  }
   ha-icon { --mdc-icon-size: 20px; }
   .body { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 16px; }
   label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--secondary-text-color); }
@@ -329,6 +403,7 @@ function buildShell(chrome) {
   let surahLine = null;
   let reciterLine = null;
   let statePill = null;
+  let progress = null;
   let volume = null;
 
   if (chrome) {
@@ -347,7 +422,30 @@ function buildShell(chrome) {
     statePill = document.createElement("div");
     statePill.className = "state-pill";
     statePill.hidden = true;
-    stage.append(brandImage("art"), surahLine, reciterLine, statePill);
+    const progressRow = document.createElement("div");
+    progressRow.className = "progress";
+    progressRow.hidden = true;
+    const elapsed = document.createElement("span");
+    elapsed.className = "time";
+    const track = document.createElement("div");
+    track.className = "track";
+    track.setAttribute("role", "progressbar");
+    track.setAttribute("aria-valuemin", "0");
+    const fill = document.createElement("div");
+    fill.className = "fill";
+    track.append(fill);
+    const seek = document.createElement("input");
+    seek.type = "range";
+    seek.className = "seek hidden";
+    seek.min = "0";
+    seek.max = "0";
+    seek.step = "1";
+    seek.value = "0";
+    const total = document.createElement("span");
+    total.className = "time end";
+    progressRow.append(elapsed, track, seek, total);
+    progress = { row: progressRow, elapsed, track, fill, seek, total };
+    stage.append(brandImage("art"), surahLine, reciterLine, statePill, progressRow);
 
     const row = document.createElement("div");
     row.className = "volume";
@@ -422,6 +520,7 @@ function buildShell(chrome) {
     surahLine,
     reciterLine,
     statePill,
+    progress,
     volume,
     player,
     reciter,
@@ -470,6 +569,13 @@ class Mp3QuranCard extends HTMLElement {
     this._loading = false;
     this._playerKey = "";
     this._volumeHold = false;
+    this._progressTimer = null;
+    this._seekHold = false;
+    this._seekPreview = null;
+  }
+
+  disconnectedCallback() {
+    this._stopProgressClock();
   }
 
   static getConfigElement() {
@@ -568,6 +674,21 @@ class Mp3QuranCard extends HTMLElement {
       ui.volume.pct.textContent = `${ui.volume.slider.value}%`;
     });
     ui.volume.slider.addEventListener("change", () => this._setVolume());
+    ui.progress.seek.addEventListener("pointerdown", () => {
+      this._seekHold = true;
+    });
+    ui.progress.seek.addEventListener("pointerup", () => {
+      const position = Number(ui.progress.seek.value);
+      this._seekHold = false;
+      if (Number.isFinite(position)) this._seekPreview = { position, at: Date.now() };
+    });
+    ui.progress.seek.addEventListener("pointercancel", () => {
+      this._seekHold = false;
+    });
+    ui.progress.seek.addEventListener("input", () => {
+      ui.progress.elapsed.textContent = formatClock(Number(ui.progress.seek.value));
+    });
+    ui.progress.seek.addEventListener("change", () => this._seek());
   }
 
   _applyStrings() {
@@ -618,6 +739,7 @@ class Mp3QuranCard extends HTMLElement {
     const text = strings(this._hass);
     const ui = this._ui;
     this._paintNow();
+    this._paintProgress();
     this._paintVolume();
     ui.status.classList.toggle("error", Boolean(this._error));
     if (this._error) {
@@ -649,6 +771,89 @@ class Mp3QuranCard extends HTMLElement {
       ui.statePill.hidden = true;
       ui.statePill.textContent = "";
     }
+  }
+
+  _paintProgress() {
+    const ui = this._ui;
+    if (!ui || !ui.progress) return;
+    const player = this._hass && this._entity ? this._hass.states[this._entity] : null;
+    const progress = trackProgress(player);
+    ui.progress.row.hidden = !progress;
+    if (!progress) {
+      this._seekPreview = null;
+      this._stopProgressClock();
+      return;
+    }
+    const features = Number((player.attributes || {}).supported_features) || 0;
+    const canSeek = (features & SEEK) !== 0;
+    const adjusting = this._seekHold || this.shadowRoot.activeElement === ui.progress.seek;
+    const position = adjusting ? Number(ui.progress.seek.value) : this._shownPosition(progress, player.state);
+    const pct = Math.min(100, Math.max(0, (position / progress.duration) * 100));
+    ui.progress.elapsed.textContent = formatClock(position);
+    ui.progress.total.textContent = formatClock(progress.duration);
+    ui.progress.fill.style.width = `${pct}%`;
+    ui.progress.track.classList.toggle("hidden", canSeek);
+    ui.progress.seek.classList.toggle("hidden", !canSeek);
+    ui.progress.seek.disabled = !canSeek;
+    if (canSeek) {
+      ui.progress.seek.max = String(progress.duration);
+      ui.progress.seek.setAttribute("aria-label", strings(this._hass).seek);
+      if (!adjusting) ui.progress.seek.value = String(Math.round(position));
+    } else {
+      ui.progress.track.setAttribute("aria-label", strings(this._hass).progress);
+      ui.progress.track.setAttribute("aria-valuenow", String(Math.floor(position)));
+      ui.progress.track.setAttribute("aria-valuemax", String(Math.floor(progress.duration)));
+    }
+    if (player.state === "playing") this._startProgressClock();
+    else this._stopProgressClock();
+  }
+
+  _shownPosition(progress, state) {
+    if (!this._seekPreview) return progress.position;
+    let position = this._seekPreview.position;
+    if (state === "playing") {
+      position += Math.max(0, (Date.now() - this._seekPreview.at) / 1000);
+    }
+    position = Math.min(progress.duration, Math.max(0, position));
+    const age = Date.now() - this._seekPreview.at;
+    const caughtUp = age > 1000 && Math.abs(progress.position - position) < 2;
+    if (age > 8000 || caughtUp) {
+      this._seekPreview = null;
+      return progress.position;
+    }
+    return position;
+  }
+
+  async _seek() {
+    if (!this._entity || !this._ui) return;
+    const position = Number(this._ui.progress.seek.value);
+    if (!Number.isFinite(position)) return;
+    this._seekHold = false;
+    this._seekPreview = { position, at: Date.now() };
+    this._error = "";
+    try {
+      await this._hass.callService(
+        "media_player",
+        "media_seek",
+        { seek_position: position },
+        { entity_id: this._entity }
+      );
+    } catch (err) {
+      this._seekPreview = null;
+      this._error = errorText(err, strings(this._hass).error);
+      this._paintStatus();
+    }
+  }
+
+  _startProgressClock() {
+    if (this._progressTimer) return;
+    this._progressTimer = window.setInterval(() => this._paintProgress(), 1000);
+  }
+
+  _stopProgressClock() {
+    if (!this._progressTimer) return;
+    window.clearInterval(this._progressTimer);
+    this._progressTimer = null;
   }
 
   _nowPlaying() {
