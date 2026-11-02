@@ -1,6 +1,7 @@
 {
   "domain": "mp3quran",
   "name": "MP3 Quran",
+  "after_dependencies": ["lovelace"],
   "codeowners": [
     "@modestpharaoh"
   ],
@@ -17,5 +18,5 @@
     "custom_components.mp3quran"
   ],
   "requirements": [],
-  "version": "1.4.1"
+  "version": "1.4.4"
 }
