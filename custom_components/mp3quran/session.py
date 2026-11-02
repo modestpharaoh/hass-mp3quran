@@ -39,6 +39,20 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def _surah_after(moshaf: Any, surah: int, *, auto_advance: bool, loop: bool) -> int | None:
+    """Return the surah to play after the current one finishes.
+
+    Auto-advance moves to the next surah in the moshaf. Loop starts again at
+    the first surah after the last one, including when auto-advance is off.
+    """
+    nxt = moshaf.next_surah(surah)
+    if nxt is not None:
+        return nxt if auto_advance else None
+    if loop and moshaf.surah_list:
+        return moshaf.surah_list[0]
+    return None
+
+
 def _same_track(content_id: str, expected_url: str, surah: int) -> bool:
     """Return True if a reported content id is still this surah.
 
@@ -69,6 +83,7 @@ class PlaybackSession:
     surah_repeat: int
     plays_remaining: int
     expected_url: str
+    loop: bool = False
     title: str = ""
     artist: str = ""
     active: bool = True
@@ -88,6 +103,7 @@ class PlaybackSession:
             "moshaf_id": self.moshaf_id,
             "surah": self.surah,
             "auto_advance": self.auto_advance,
+            "loop": self.loop,
             "surah_repeat": self.surah_repeat,
             "plays_remaining": self.plays_remaining,
             "url": self.expected_url,
@@ -188,6 +204,7 @@ class PlaybackSessionManager:
         *,
         auto_advance: bool,
         surah_repeat: int,
+        loop: bool = False,
         play: bool = True,
     ) -> PlaybackSession:
         """Start or replace a playback session and optionally play now."""
@@ -201,6 +218,7 @@ class PlaybackSessionManager:
             moshaf_id=moshaf.id,
             surah=surah,
             auto_advance=auto_advance,
+            loop=loop,
             surah_repeat=max(1, surah_repeat),
             plays_remaining=max(1, surah_repeat),
             expected_url=url,
@@ -350,15 +368,23 @@ class PlaybackSessionManager:
         """Mark sessions interrupted when HA stops/pauses/turns off a player."""
         domain = event.data.get("domain")
         service = event.data.get("service")
-        if domain != MEDIA_PLAYER_DOMAIN or service not in _USER_STOP_SERVICES:
+        if domain != MEDIA_PLAYER_DOMAIN:
             return
-        # Ignore stops we initiated ourselves while clearing a session.
         service_data = event.data.get("service_data") or {}
         entity_ids = service_data.get(ATTR_ENTITY_ID)
         if entity_ids is None:
             return
         if isinstance(entity_ids, str):
             entity_ids = [entity_ids]
+        if service == "media_play":
+            for entity_id in entity_ids:
+                session = self._sessions.get(entity_id)
+                if session is not None:
+                    session.user_interrupted = False
+            return
+        if service not in _USER_STOP_SERVICES:
+            return
+        # Ignore stops we initiated ourselves while clearing a session.
         for entity_id in entity_ids:
             if entity_id in self._stopping or entity_id in self._advancing:
                 continue
@@ -506,14 +532,6 @@ class PlaybackSessionManager:
                 self._notify_listeners()
                 return
 
-            if not session.auto_advance:
-                _LOGGER.debug(
-                    "Session complete on %s (auto-advance disabled)",
-                    session.entity_id,
-                )
-                self.stop(session.entity_id)
-                return
-
             catalog = self.catalog
             if catalog is None:
                 self.stop(session.entity_id)
@@ -527,7 +545,12 @@ class PlaybackSessionManager:
                 self.stop(session.entity_id)
                 return
 
-            next_surah = moshaf.next_surah(session.surah)
+            next_surah = _surah_after(
+                moshaf,
+                session.surah,
+                auto_advance=session.auto_advance,
+                loop=session.loop,
+            )
             if next_surah is None:
                 _LOGGER.debug(
                     "Reached last surah on %s; ending session",
@@ -557,6 +580,58 @@ class PlaybackSessionManager:
             self._notify_listeners()
         finally:
             self._advancing.discard(session.entity_id)
+
+    async def async_skip(self, entity_id: str, *, step: int) -> None:
+        """Jump the active session to the next or previous surah and play it."""
+        session = self._sessions.get(entity_id)
+        if session is None or not session.active:
+            raise ValueError("No active MP3 Quran session on this media player")
+        if entity_id in self._advancing:
+            return
+
+        catalog = self.catalog
+        if catalog is None:
+            raise ValueError("MP3 Quran catalog is not ready")
+        reciter = catalog.get_reciter(session.reciter_id)
+        if reciter is None:
+            raise ValueError("Reciter for this session is no longer available")
+        moshaf = reciter.get_moshaf(session.moshaf_id)
+        if moshaf is None:
+            raise ValueError("Moshaf for this session is no longer available")
+
+        if step > 0:
+            target = moshaf.next_surah(session.surah)
+            if target is None and session.loop and moshaf.surah_list:
+                target = moshaf.surah_list[0]
+        else:
+            target = moshaf.previous_surah(session.surah)
+        if target is None:
+            edge = "next" if step > 0 else "previous"
+            raise ValueError(f"This moshaf has no {edge} surah")
+
+        self._advancing.add(entity_id)
+        try:
+            url, title, artist = self._metadata_for(reciter, moshaf, target)
+            session.surah = target
+            session.expected_url = url
+            session.title = title
+            session.artist = artist
+            session.plays_remaining = session.surah_repeat
+            session.user_interrupted = False
+            session.last_position = None
+            session.last_duration = None
+            session.max_position = 0.0
+            session.pending_play = True
+            await self._async_play_url(
+                entity_id,
+                url,
+                title=title,
+                artist=artist,
+                blocking=False,
+            )
+            self._notify_listeners()
+        finally:
+            self._advancing.discard(entity_id)
 
     async def _async_clear_playlist(self, entity_id: str) -> None:
         """Clear a player playlist when supported.

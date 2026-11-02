@@ -15,17 +15,21 @@ from homeassistant.helpers.service import async_extract_entity_ids
 
 from .const import (
     ATTR_AUTO_ADVANCE,
+    ATTR_LOOP,
     ATTR_MOSHAF_ID,
     ATTR_RECITER_ID,
     ATTR_SURAH,
     ATTR_SURAH_REPEAT,
     CONF_SURAH_REPEAT,
     DEFAULT_AUTO_ADVANCE,
+    DEFAULT_LOOP,
     DEFAULT_SURAH_REPEAT,
     DOMAIN,
     MAX_SURAH_REPEAT,
     MIN_SURAH_REPEAT,
+    SERVICE_NEXT_SURAH,
     SERVICE_PLAY,
+    SERVICE_PREVIOUS_SURAH,
     SERVICE_STOP,
 )
 from .coordinator import Mp3QuranCoordinator
@@ -41,6 +45,7 @@ PLAY_SCHEMA = vol.Schema(
             vol.Coerce(int), vol.Range(min=1, max=114)
         ),
         vol.Optional(ATTR_AUTO_ADVANCE, default=DEFAULT_AUTO_ADVANCE): cv.boolean,
+        vol.Optional(ATTR_LOOP, default=DEFAULT_LOOP): cv.boolean,
         vol.Optional(ATTR_SURAH_REPEAT): vol.All(
             vol.Coerce(int),
             vol.Range(min=MIN_SURAH_REPEAT, max=MAX_SURAH_REPEAT),
@@ -126,6 +131,7 @@ def async_register_services(
 
         options = coordinator.entry.options
         auto_advance = call.data.get(ATTR_AUTO_ADVANCE, DEFAULT_AUTO_ADVANCE)
+        loop = call.data.get(ATTR_LOOP, DEFAULT_LOOP)
         surah_repeat = call.data.get(
             ATTR_SURAH_REPEAT,
             options.get(CONF_SURAH_REPEAT, DEFAULT_SURAH_REPEAT),
@@ -139,12 +145,29 @@ def async_register_services(
                 surah,
                 auto_advance=bool(auto_advance),
                 surah_repeat=int(surah_repeat),
+                loop=bool(loop),
             )
 
     async def async_handle_stop(call: ServiceCall) -> None:
         """Stop continuous playback sessions and current audio."""
         for entity_id in await _entity_ids(call):
             await sessions.async_stop(entity_id, stop_media=True)
+
+    async def _handle_skip(call: ServiceCall, step: int) -> None:
+        """Move each targeted session to the neighboring surah."""
+        for entity_id in await _entity_ids(call):
+            try:
+                await sessions.async_skip(entity_id, step=step)
+            except ValueError as err:
+                raise HomeAssistantError(str(err)) from err
+
+    async def async_handle_next(call: ServiceCall) -> None:
+        """Play the next surah in the active session."""
+        await _handle_skip(call, 1)
+
+    async def async_handle_previous(call: ServiceCall) -> None:
+        """Play the previous surah in the active session."""
+        await _handle_skip(call, -1)
 
     if not hass.services.has_service(DOMAIN, SERVICE_PLAY):
         hass.services.async_register(
@@ -158,6 +181,20 @@ def async_register_services(
             DOMAIN,
             SERVICE_STOP,
             async_handle_stop,
+            schema=STOP_SCHEMA,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_NEXT_SURAH):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_NEXT_SURAH,
+            async_handle_next,
+            schema=STOP_SCHEMA,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_PREVIOUS_SURAH):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_PREVIOUS_SURAH,
+            async_handle_previous,
             schema=STOP_SCHEMA,
         )
 
@@ -211,6 +248,11 @@ def _media_players_from_registry(hass: HomeAssistant, data: dict[str, Any]) -> s
 
 def async_unregister_services(hass: HomeAssistant) -> None:
     """Unregister domain services when the last entry unloads."""
-    for service in (SERVICE_PLAY, SERVICE_STOP):
+    for service in (
+        SERVICE_PLAY,
+        SERVICE_STOP,
+        SERVICE_NEXT_SURAH,
+        SERVICE_PREVIOUS_SURAH,
+    ):
         if hass.services.has_service(DOMAIN, service):
             hass.services.async_remove(DOMAIN, service)

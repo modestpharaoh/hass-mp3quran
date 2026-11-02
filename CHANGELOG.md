@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.6
+
+- The dashboard card can pause and resume players that support it. Those controls sit in the track panel with previous and next surah. Resume keeps auto-advance available when the surah ends.
+- `mp3quran.next_surah` and `mp3quran.previous_surah` move the active session to the neighboring surah in that moshaf.
+- `mp3quran.play` and the dashboard card can loop back to the first surah after the last one. Loop is off unless you turn it on.
+
 ## 1.4.5
 
 - The dashboard card shows the current track position, duration, and a progress bar while the selected media player is playing or paused. Dragging that bar seeks when the player supports it.

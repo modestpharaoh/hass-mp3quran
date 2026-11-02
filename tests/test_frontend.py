@@ -12,7 +12,7 @@ from custom_components.mp3quran.const import CARD_URL
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.core import HomeAssistant
 
-CARD_RESOURCE = f"{CARD_URL}?v=1.4.5"
+CARD_RESOURCE = f"{CARD_URL}?v=1.4.6"
 
 
 def _run_tasks(hass: HomeAssistant) -> None:

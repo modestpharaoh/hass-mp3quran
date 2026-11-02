@@ -68,6 +68,7 @@ data:
   moshaf_id: 102
   surah: 1
   auto_advance: true
+  loop: false
   surah_repeat: 1
 ```
 
@@ -82,6 +83,16 @@ target:
 ```
 
 Or press the matching **Stop MP3 Quran (...)** button entity created when a session starts on that player.
+
+Skip within the active session:
+
+```yaml
+action: mp3quran.next_surah
+target:
+  entity_id: media_player.living_room
+```
+
+`mp3quran.previous_surah` plays the previous surah in that moshaf. Both keep the session’s repeat count and auto-advance setting. They stop at the first and last available surah.
 
 ### Session status
 
@@ -102,9 +113,10 @@ moshaf_id: 102
 surah: 1
 surah_repeat: 1
 auto_advance: false
+loop: false
 ```
 
-Every field except `type` is an optional starting value. The card shows the MP3 Quran icon, the current surah, and the reciter and moshaf above the media player selector. While the player is playing or paused and reports track progress, the card shows the elapsed time, the duration, and a progress bar. Dragging the bar seeks when that player supports seek. Players that do not report progress, such as many ESPHome speakers, keep the bar hidden. You can set that player’s volume, then choose the reciter, moshaf (only when that reciter has more than one), starting surah, repeat count, and whether to advance. **Play** calls `mp3quran.play`. **Stop** calls `mp3quran.stop`. Names follow the integration display language, and favorite reciters stay at the top. While that player has a session, the surah and reciter lines follow the active session.
+Every field except `type` is an optional starting value. The card shows the MP3 Quran icon, the current surah, and the reciter and moshaf above the media player selector. While the player is playing or paused and reports track progress, the card shows the elapsed time, the duration, and a progress bar. Dragging the bar seeks when that player supports seek. Players that do not report progress, such as many ESPHome speakers, keep the bar hidden. You can set that player’s volume, then choose the reciter, moshaf (only when that reciter has more than one), starting surah, repeat count, whether to advance, and whether to loop back to the first surah after the last one. Loop is off unless you turn it on. **Play** calls `mp3quran.play`. **Stop** calls `mp3quran.stop`. In the track panel, **Pause** and **Resume** call the media player when it supports them, and the previous and next buttons call `mp3quran.previous_surah` and `mp3quran.next_surah` for the active session. Names follow the integration display language, and favorite reciters stay at the top. While that player has a session, the surah and reciter lines follow the active session.
 
 ### Metadata
 
@@ -143,6 +155,12 @@ actions:
 ```
 
 ## Changelog
+
+### 1.4.6
+
+- The dashboard card can pause and resume players that support it. Those controls sit in the track panel with previous and next surah. Resume keeps auto-advance available when the surah ends.
+- `mp3quran.next_surah` and `mp3quran.previous_surah` move the active session to the neighboring surah in that moshaf.
+- `mp3quran.play` and the dashboard card can loop back to the first surah after the last one. Loop is off unless you turn it on.
 
 ### 1.4.5
 

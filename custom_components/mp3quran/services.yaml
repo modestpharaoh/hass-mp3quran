@@ -38,6 +38,13 @@ play:
       default: false
       selector:
         boolean:
+    loop:
+      name: Loop
+      description: After the last surah, continue from the first surah. Defaults to off.
+      required: false
+      default: false
+      selector:
+        boolean:
     surah_repeat:
       name: Surah repeat
       description: How many times to play each surah before advancing (1-20). Defaults to the integration option.
@@ -51,6 +58,20 @@ play:
 stop:
   name: Stop Quran session
   description: Stop continuous playback for a media player (clears the session and stops current audio).
+  target:
+    entity:
+      domain: media_player
+
+next_surah:
+  name: Next surah
+  description: Play the next surah in the active MP3 Quran session. Repeat count starts over for that surah.
+  target:
+    entity:
+      domain: media_player
+
+previous_surah:
+  name: Previous surah
+  description: Play the previous surah in the active MP3 Quran session. Repeat count starts over for that surah.
   target:
     entity:
       domain: media_player

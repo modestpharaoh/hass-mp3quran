@@ -59,6 +59,9 @@ def test_moshaf_audio_url_and_next() -> None:
     assert moshaf.next_surah(1) == 78
     assert moshaf.next_surah(78) == 114
     assert moshaf.next_surah(114) is None
+    assert moshaf.previous_surah(114) == 78
+    assert moshaf.previous_surah(78) == 1
+    assert moshaf.previous_surah(1) is None
     assert moshaf.has_surah(78)
     assert not moshaf.has_surah(2)
 
