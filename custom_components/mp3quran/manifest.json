@@ -1,7 +1,9 @@
 {
   "domain": "mp3quran",
   "name": "MP3 Quran",
-  "after_dependencies": ["lovelace"],
+  "after_dependencies": [
+    "lovelace"
+  ],
   "codeowners": [
     "@modestpharaoh"
   ],
