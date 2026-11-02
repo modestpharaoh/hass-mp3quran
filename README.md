@@ -90,6 +90,8 @@ Or press the matching **Stop MP3 Quran (...)** button entity created when a sess
 
 ### Dashboard card
 
+![MP3 Quran card](docs/mp3quran-card.png)
+
 The integration registers a Lovelace card. After a restart, add **MP3 Quran** from the card picker, or paste:
 
 ```yaml
@@ -139,6 +141,22 @@ actions:
       auto_advance: false
       surah_repeat: 1
 ```
+
+## Changelog
+
+### 1.4.1
+
+Changes since [1.1.0](https://github.com/modestpharaoh/hass-mp3quran/releases/tag/v1.1.0).
+
+- **Dashboard card** — pick a media player, reciter, moshaf, starting surah, repeat count, and auto-advance. The card shows the MP3 Quran icon, the current surah, and the reciter and moshaf, and it can raise or lower that player’s volume.
+- **Favorite reciters** — pin reciters in the integration options. They sort to the top of the media source and are marked with a star.
+- **Auto-advance** — defaults to off, and is chosen on each `mp3quran.play` call.
+- **Targets** — `mp3quran.play` and `mp3quran.stop` accept a media player entity, or a device or area that includes one.
+- **Stop** — `mp3quran.stop` clears the session and stops the audio. Stopping mid-surah does not advance.
+- **Sessions** — `sensor.mp3quran_active_sessions` counts continuous sessions. A stop button is added for each player that has had a session. The sensor icon is a book.
+- **Players** — Chromecast shows the surah, reciter, and moshaf, and it advances when the surah ends. VLC’s playlist is cleared before each surah.
+
+The same notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Development
 
