@@ -23,10 +23,8 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
-    CONF_AUTO_ADVANCE,
     CONF_DISPLAY_LANGUAGE,
     CONF_SURAH_REPEAT,
-    DEFAULT_AUTO_ADVANCE,
     DEFAULT_DISPLAY_LANGUAGE,
     DEFAULT_SURAH_REPEAT,
     DISPLAY_LANGUAGES,
@@ -51,10 +49,6 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                     translation_key=CONF_DISPLAY_LANGUAGE,
                 )
             ),
-            vol.Required(
-                CONF_AUTO_ADVANCE,
-                default=defaults.get(CONF_AUTO_ADVANCE, DEFAULT_AUTO_ADVANCE),
-            ): bool,
             vol.Required(
                 CONF_SURAH_REPEAT,
                 default=defaults.get(CONF_SURAH_REPEAT, DEFAULT_SURAH_REPEAT),
@@ -90,9 +84,6 @@ class Mp3QuranConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_DISPLAY_LANGUAGE: user_input.get(
                         CONF_DISPLAY_LANGUAGE, DEFAULT_DISPLAY_LANGUAGE
                     ),
-                    CONF_AUTO_ADVANCE: user_input.get(
-                        CONF_AUTO_ADVANCE, DEFAULT_AUTO_ADVANCE
-                    ),
                     CONF_SURAH_REPEAT: int(
                         user_input.get(CONF_SURAH_REPEAT, DEFAULT_SURAH_REPEAT)
                     ),
@@ -104,7 +95,6 @@ class Mp3QuranConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=_options_schema(
                 {
                     CONF_DISPLAY_LANGUAGE: DEFAULT_DISPLAY_LANGUAGE,
-                    CONF_AUTO_ADVANCE: DEFAULT_AUTO_ADVANCE,
                     CONF_SURAH_REPEAT: DEFAULT_SURAH_REPEAT,
                 }
             ),
@@ -129,7 +119,6 @@ class Mp3QuranOptionsFlowHandler(OptionsFlow):
                 title="",
                 data={
                     CONF_DISPLAY_LANGUAGE: user_input[CONF_DISPLAY_LANGUAGE],
-                    CONF_AUTO_ADVANCE: user_input[CONF_AUTO_ADVANCE],
                     CONF_SURAH_REPEAT: int(user_input[CONF_SURAH_REPEAT]),
                 },
             )

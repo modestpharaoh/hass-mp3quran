@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
@@ -18,6 +19,8 @@ from .session import PlaybackSessionManager
 _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
+
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON]
 
 
 @dataclass(slots=True)
@@ -48,6 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: Mp3QuranConfigEntry) -> 
     )
 
     async_register_services(hass, coordinator, sessions)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     _LOGGER.info(
@@ -59,6 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: Mp3QuranConfigEntry) -> 
 
 async def async_unload_entry(hass: HomeAssistant, entry: Mp3QuranConfigEntry) -> bool:
     """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     entry.runtime_data.sessions.async_unload()
 
     other_entries = [
@@ -69,7 +74,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: Mp3QuranConfigEntry) ->
     if not other_entries:
         async_unregister_services(hass)
 
-    return True
+    return unload_ok
 
 
 async def _async_update_listener(

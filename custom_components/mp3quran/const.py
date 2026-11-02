@@ -10,8 +10,9 @@ DEFAULT_UPDATE_INTERVAL_HOURS = 24
 # Preferred option key. Older installs may still have CONF_SORT_LANGUAGE.
 CONF_DISPLAY_LANGUAGE = "display_language"
 CONF_SORT_LANGUAGE = "sort_language"  # legacy alias
-CONF_AUTO_ADVANCE = "auto_advance"
 CONF_SURAH_REPEAT = "surah_repeat"
+# Legacy option key (removed from UI; ignored if still present in storage).
+CONF_AUTO_ADVANCE = "auto_advance"
 
 LANG_ENGLISH = "english"
 LANG_ARABIC = "arabic"
@@ -24,11 +25,16 @@ SORT_LANGUAGES = DISPLAY_LANGUAGES
 
 DEFAULT_DISPLAY_LANGUAGE = LANG_ENGLISH
 DEFAULT_SORT_LANGUAGE = DEFAULT_DISPLAY_LANGUAGE
-DEFAULT_AUTO_ADVANCE = True
+DEFAULT_AUTO_ADVANCE = False
 DEFAULT_SURAH_REPEAT = 1
 
 MIN_SURAH_REPEAT = 1
 MAX_SURAH_REPEAT = 20
+
+# Treat track as finished when within this many seconds of duration,
+# or when position/duration ratio is at least this value.
+END_OF_TRACK_SLACK_SECONDS = 5.0
+END_OF_TRACK_RATIO = 0.95
 
 ATTR_RECITER_ID = "reciter_id"
 ATTR_MOSHAF_ID = "moshaf_id"
@@ -41,11 +47,14 @@ SERVICE_PLAY = "play"
 SERVICE_STOP = "stop"
 
 MIME_TYPE_MP3 = "audio/mpeg"
+MEDIA_TYPE_MUSIC = "music"
 
 # Media source identifier prefixes
 ID_RECITER = "reciter"
 ID_MOSHAF = "moshaf"
 ID_SURAH = "surah"
+
+PLATFORMS = ["sensor", "button"]
 
 
 def get_display_language(options: dict) -> str:

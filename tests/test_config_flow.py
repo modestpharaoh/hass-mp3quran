@@ -6,7 +6,6 @@ import pytest
 
 from custom_components.mp3quran.config_flow import Mp3QuranConfigFlow
 from custom_components.mp3quran.const import (
-    CONF_AUTO_ADVANCE,
     CONF_DISPLAY_LANGUAGE,
     CONF_SURAH_REPEAT,
     DEFAULT_AUTO_ADVANCE,
@@ -29,7 +28,6 @@ async def test_user_step_creates_entry() -> None:
     result = await flow.async_step_user(
         {
             CONF_DISPLAY_LANGUAGE: "arabic",
-            CONF_AUTO_ADVANCE: False,
             CONF_SURAH_REPEAT: 3,
         }
     )
@@ -37,8 +35,9 @@ async def test_user_step_creates_entry() -> None:
     assert result["title"] == "MP3 Quran"
     assert result["data"] == {}
     assert result["options"][CONF_DISPLAY_LANGUAGE] == "arabic"
-    assert result["options"][CONF_AUTO_ADVANCE] is False
+    assert CONF_SURAH_REPEAT in result["options"]
     assert result["options"][CONF_SURAH_REPEAT] == 3
+    assert "auto_advance" not in result["options"]
 
 
 @pytest.mark.asyncio
@@ -56,8 +55,9 @@ async def test_defaults_on_empty_submit() -> None:
     result = await flow.async_step_user({})
     assert result["type"] == "create_entry"
     assert result["options"][CONF_DISPLAY_LANGUAGE] == DEFAULT_DISPLAY_LANGUAGE
-    assert result["options"][CONF_AUTO_ADVANCE] == DEFAULT_AUTO_ADVANCE
     assert result["options"][CONF_SURAH_REPEAT] == DEFAULT_SURAH_REPEAT
+    assert "auto_advance" not in result["options"]
+    assert DEFAULT_AUTO_ADVANCE is False
     assert DOMAIN == "mp3quran"
 
 

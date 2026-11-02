@@ -1,6 +1,6 @@
 play:
   name: Play Quran
-  description: Play a surah on a media player with optional auto-advance and repeat.
+  description: Play a surah on a media player with optional auto-advance and repeat. Auto-advance defaults to off.
   target:
     entity:
       domain: media_player
@@ -33,13 +33,14 @@ play:
           mode: box
     auto_advance:
       name: Auto-advance
-      description: Play the next surah when the current one finishes. Defaults to the integration option.
+      description: Play the next surah when the current one finishes. Defaults to off.
       required: false
+      default: false
       selector:
         boolean:
     surah_repeat:
       name: Surah repeat
-      description: How many times to play each surah before advancing (1-20).
+      description: How many times to play each surah before advancing (1-20). Defaults to the integration option.
       required: false
       selector:
         number:
@@ -49,7 +50,7 @@ play:
 
 stop:
   name: Stop Quran session
-  description: Stop continuous playback session tracking for a media player.
+  description: Stop continuous playback for a media player (clears the session and stops current audio).
   target:
     entity:
       domain: media_player
