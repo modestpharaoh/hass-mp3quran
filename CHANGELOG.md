@@ -1,9 +1,5 @@
 # Changelog
 
-## 1.4.4
-
-- The dashboard card is added to Settings, Dashboards, Resources when Home Assistant finishes starting, as `/mp3quran/mp3quran-card.js`.
-
 ## 1.4.1
 
 Changes since 1.1.0.

@@ -37,19 +37,12 @@ def _ensure_ha_stubs() -> None:
     ha_const.STATE_OFF = "off"
     ha_const.STATE_UNAVAILABLE = "unavailable"
     ha_const.EVENT_CALL_SERVICE = "call_service"
-    ha_const.EVENT_HOMEASSISTANT_STARTED = "homeassistant_started"
     ha_const.SERVICE_TURN_OFF = "turn_off"
     ha_const.Platform = types.SimpleNamespace(SENSOR="sensor", BUTTON="button")
     sys.modules["homeassistant.const"] = ha_const
 
     # core
     ha_core = types.ModuleType("homeassistant.core")
-
-    class CoreState:
-        running = "RUNNING"
-        starting = "STARTING"
-
-    ha_core.CoreState = CoreState
 
     class HomeAssistant:
         def __init__(self) -> None:

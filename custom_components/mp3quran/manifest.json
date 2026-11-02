@@ -5,7 +5,6 @@
     "@modestpharaoh"
   ],
   "config_flow": true,
-  "after_dependencies": ["lovelace"],
   "dependencies": [
     "http",
     "media_source"
@@ -18,5 +17,5 @@
     "custom_components.mp3quran"
   ],
   "requirements": [],
-  "version": "1.4.4"
+  "version": "1.4.1"
 }
