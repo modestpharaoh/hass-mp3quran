@@ -1,11 +1,11 @@
 {
   "domain": "mp3quran",
   "name": "MP3 Quran",
+  "after_dependencies": ["lovelace"],
   "codeowners": [
     "@modestpharaoh"
   ],
   "config_flow": true,
-  "after_dependencies": ["lovelace"],
   "dependencies": [
     "http",
     "media_source"
