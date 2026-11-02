@@ -15,12 +15,14 @@ from homeassistant.helpers.service import async_extract_entity_ids
 
 from .const import (
     ATTR_AUTO_ADVANCE,
+    ATTR_LOOP,
     ATTR_MOSHAF_ID,
     ATTR_RECITER_ID,
     ATTR_SURAH,
     ATTR_SURAH_REPEAT,
     CONF_SURAH_REPEAT,
     DEFAULT_AUTO_ADVANCE,
+    DEFAULT_LOOP,
     DEFAULT_SURAH_REPEAT,
     DOMAIN,
     MAX_SURAH_REPEAT,
@@ -43,6 +45,7 @@ PLAY_SCHEMA = vol.Schema(
             vol.Coerce(int), vol.Range(min=1, max=114)
         ),
         vol.Optional(ATTR_AUTO_ADVANCE, default=DEFAULT_AUTO_ADVANCE): cv.boolean,
+        vol.Optional(ATTR_LOOP, default=DEFAULT_LOOP): cv.boolean,
         vol.Optional(ATTR_SURAH_REPEAT): vol.All(
             vol.Coerce(int),
             vol.Range(min=MIN_SURAH_REPEAT, max=MAX_SURAH_REPEAT),
@@ -128,6 +131,7 @@ def async_register_services(
 
         options = coordinator.entry.options
         auto_advance = call.data.get(ATTR_AUTO_ADVANCE, DEFAULT_AUTO_ADVANCE)
+        loop = call.data.get(ATTR_LOOP, DEFAULT_LOOP)
         surah_repeat = call.data.get(
             ATTR_SURAH_REPEAT,
             options.get(CONF_SURAH_REPEAT, DEFAULT_SURAH_REPEAT),
@@ -141,6 +145,7 @@ def async_register_services(
                 surah,
                 auto_advance=bool(auto_advance),
                 surah_repeat=int(surah_repeat),
+                loop=bool(loop),
             )
 
     async def async_handle_stop(call: ServiceCall) -> None:

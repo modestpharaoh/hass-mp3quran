@@ -55,6 +55,7 @@ async def test_play_defaults_auto_advance_off(hass) -> None:
     session = sessions.get_session("media_player.living_room")
     assert session is not None
     assert session.auto_advance is False
+    assert session.loop is False
     assert session.surah_repeat == 2
     handlers = {
         call.args[1]: call.args[2] for call in hass.services.async_register.call_args_list

@@ -39,6 +39,20 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def _surah_after(moshaf: Any, surah: int, *, auto_advance: bool, loop: bool) -> int | None:
+    """Return the surah to play after the current one finishes.
+
+    Auto-advance moves to the next surah in the moshaf. Loop starts again at
+    the first surah after the last one, including when auto-advance is off.
+    """
+    nxt = moshaf.next_surah(surah)
+    if nxt is not None:
+        return nxt if auto_advance else None
+    if loop and moshaf.surah_list:
+        return moshaf.surah_list[0]
+    return None
+
+
 def _same_track(content_id: str, expected_url: str, surah: int) -> bool:
     """Return True if a reported content id is still this surah.
 
@@ -69,6 +83,7 @@ class PlaybackSession:
     surah_repeat: int
     plays_remaining: int
     expected_url: str
+    loop: bool = False
     title: str = ""
     artist: str = ""
     active: bool = True
@@ -88,6 +103,7 @@ class PlaybackSession:
             "moshaf_id": self.moshaf_id,
             "surah": self.surah,
             "auto_advance": self.auto_advance,
+            "loop": self.loop,
             "surah_repeat": self.surah_repeat,
             "plays_remaining": self.plays_remaining,
             "url": self.expected_url,
@@ -188,6 +204,7 @@ class PlaybackSessionManager:
         *,
         auto_advance: bool,
         surah_repeat: int,
+        loop: bool = False,
         play: bool = True,
     ) -> PlaybackSession:
         """Start or replace a playback session and optionally play now."""
@@ -201,6 +218,7 @@ class PlaybackSessionManager:
             moshaf_id=moshaf.id,
             surah=surah,
             auto_advance=auto_advance,
+            loop=loop,
             surah_repeat=max(1, surah_repeat),
             plays_remaining=max(1, surah_repeat),
             expected_url=url,
@@ -514,14 +532,6 @@ class PlaybackSessionManager:
                 self._notify_listeners()
                 return
 
-            if not session.auto_advance:
-                _LOGGER.debug(
-                    "Session complete on %s (auto-advance disabled)",
-                    session.entity_id,
-                )
-                self.stop(session.entity_id)
-                return
-
             catalog = self.catalog
             if catalog is None:
                 self.stop(session.entity_id)
@@ -535,7 +545,12 @@ class PlaybackSessionManager:
                 self.stop(session.entity_id)
                 return
 
-            next_surah = moshaf.next_surah(session.surah)
+            next_surah = _surah_after(
+                moshaf,
+                session.surah,
+                auto_advance=session.auto_advance,
+                loop=session.loop,
+            )
             if next_surah is None:
                 _LOGGER.debug(
                     "Reached last surah on %s; ending session",
@@ -584,11 +599,12 @@ class PlaybackSessionManager:
         if moshaf is None:
             raise ValueError("Moshaf for this session is no longer available")
 
-        target = (
-            moshaf.next_surah(session.surah)
-            if step > 0
-            else moshaf.previous_surah(session.surah)
-        )
+        if step > 0:
+            target = moshaf.next_surah(session.surah)
+            if target is None and session.loop and moshaf.surah_list:
+                target = moshaf.surah_list[0]
+        else:
+            target = moshaf.previous_surah(session.surah)
         if target is None:
             edge = "next" if step > 0 else "previous"
             raise ValueError(f"This moshaf has no {edge} surah")

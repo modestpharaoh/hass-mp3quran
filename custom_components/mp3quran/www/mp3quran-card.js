@@ -16,6 +16,7 @@ const STRINGS = {
     surah: "Starting surah",
     repeat: "Surah repeat",
     advance: "Advance to next surah",
+    loop: "Loop back to the first surah",
     play: "Play",
     pause: "Pause",
     resume: "Resume",
@@ -45,6 +46,7 @@ const STRINGS = {
     surah: "سورة البداية",
     repeat: "تكرار السورة",
     advance: "الانتقال إلى السورة التالية",
+    loop: "العودة إلى السورة الأولى",
     play: "تشغيل",
     pause: "إيقاف مؤقت",
     resume: "استئناف",
@@ -527,6 +529,12 @@ function buildShell(chrome) {
   const advanceInput = document.createElement("input");
   advanceInput.type = "checkbox";
   advance.append(advanceText, advanceInput);
+  const loop = document.createElement("label");
+  loop.className = "switch";
+  const loopText = document.createElement("span");
+  const loopInput = document.createElement("input");
+  loopInput.type = "checkbox";
+  loop.append(loopText, loopInput);
 
   const actions = document.createElement("div");
   actions.className = "actions";
@@ -555,7 +563,7 @@ function buildShell(chrome) {
 
   const rows = [player.label];
   if (volume) rows.push(volume.row);
-  rows.push(reciter.label, moshaf.label, surah.label, repeat.label, advance, actions, status);
+  rows.push(reciter.label, moshaf.label, surah.label, repeat.label, advance, loop, actions, status);
   body.append(...rows);
   card.append(body);
   return {
@@ -580,6 +588,9 @@ function buildShell(chrome) {
     advance,
     advanceText,
     advanceInput,
+    loop,
+    loopText,
+    loopInput,
     actions,
     play,
     playLabel,
@@ -610,6 +621,7 @@ class Mp3QuranCard extends HTMLElement {
     this._surah = null;
     this._repeat = 1;
     this._autoAdvance = false;
+    this._loop = false;
     this._reciters = [];
     this._moshafs = [];
     this._surahs = [];
@@ -633,7 +645,7 @@ class Mp3QuranCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { surah_repeat: 1, auto_advance: false };
+    return { surah_repeat: 1, auto_advance: false, loop: false };
   }
 
   setConfig(config) {
@@ -649,6 +661,7 @@ class Mp3QuranCard extends HTMLElement {
       this._surah = numberOrNull(config.surah);
       this._repeat = clampRepeat(config.surah_repeat == null ? 1 : config.surah_repeat);
       this._autoAdvance = Boolean(config.auto_advance);
+      this._loop = Boolean(config.loop);
     }
     if (this._hass) this._ensure();
   }
@@ -710,6 +723,10 @@ class Mp3QuranCard extends HTMLElement {
     ui.advanceInput.addEventListener("change", () => {
       this._autoAdvance = ui.advanceInput.checked;
     });
+    ui.loopInput.addEventListener("change", () => {
+      this._loop = ui.loopInput.checked;
+      this._paintTransport();
+    });
     ui.play.addEventListener("click", () => this._play());
     ui.previous.addEventListener("click", () => this._skip(-1));
     ui.pause.addEventListener("click", () => this._pauseToggle());
@@ -759,6 +776,7 @@ class Mp3QuranCard extends HTMLElement {
     ui.surah.text.textContent = text.surah;
     ui.repeat.text.textContent = text.repeat;
     ui.advanceText.textContent = text.advance;
+    ui.loopText.textContent = text.loop;
     ui.playLabel.textContent = text.play;
     ui.stopLabel.textContent = text.stop;
   }
@@ -785,6 +803,7 @@ class Mp3QuranCard extends HTMLElement {
       ui.repeat.input.value = String(this._repeat);
     }
     ui.advanceInput.checked = this._autoAdvance;
+    ui.loopInput.checked = this._loop;
     const canPlay = Boolean(this._entity && this._reciterId && this._surah) && !this._loading;
     ui.play.disabled = !canPlay;
     ui.stop.disabled = !this._entity;
@@ -849,9 +868,10 @@ class Mp3QuranCard extends HTMLElement {
     const current = session ? Number(session.surah) : this._surah;
     const index = this._surahs.findIndex((item) => item.id === current);
     const known = index !== -1;
+    const loop = session && typeof session.loop === "boolean" ? session.loop : this._loop;
     ui.previous.disabled = !this._entity || (known ? index <= 0 : !session);
     ui.next.disabled =
-      !this._entity || (known ? index >= this._surahs.length - 1 : !session);
+      !this._entity || (known ? index >= this._surahs.length - 1 && !loop : !session);
   }
 
   _paintProgress() {
@@ -1136,6 +1156,7 @@ class Mp3QuranCard extends HTMLElement {
     const text = strings(this._hass);
     this._repeat = clampRepeat(this._ui.repeat.input.value);
     this._autoAdvance = this._ui.advanceInput.checked;
+    this._loop = this._ui.loopInput.checked;
     if (!this._entity || this._reciterId == null || this._surah == null) {
       this._error = text.missing;
       this._paintStatus();
@@ -1146,6 +1167,7 @@ class Mp3QuranCard extends HTMLElement {
       surah: this._surah,
       surah_repeat: this._repeat,
       auto_advance: this._autoAdvance,
+      loop: this._loop,
     };
     if (this._showMoshaf && this._moshafId != null) {
       data.moshaf_id = this._moshafId;
@@ -1175,7 +1197,10 @@ class Mp3QuranCard extends HTMLElement {
         return;
       }
       const index = this._surahs.findIndex((item) => item.id === this._surah);
-      const neighbor = index === -1 ? null : this._surahs[index + direction];
+      let neighbor = index === -1 ? null : this._surahs[index + direction];
+      if (!neighbor && direction > 0 && this._loop && index === this._surahs.length - 1) {
+        neighbor = this._surahs[0];
+      }
       if (!neighbor) return;
       this._surah = neighbor.id;
       this._paintSelections();
@@ -1267,6 +1292,7 @@ class Mp3QuranCardEditor extends HTMLElement {
     ui.surah.text.textContent = text.surah;
     ui.repeat.text.textContent = text.repeat;
     ui.advanceText.textContent = text.advance;
+    ui.loopText.textContent = text.loop;
     ui.playLabel.textContent = text.play;
     ui.stopLabel.textContent = text.stop;
   }
@@ -1285,6 +1311,7 @@ class Mp3QuranCardEditor extends HTMLElement {
       );
     }
     ui.advanceInput.checked = Boolean(this._config.auto_advance);
+    ui.loopInput.checked = Boolean(this._config.loop);
   }
 
   _bind() {
@@ -1318,6 +1345,9 @@ class Mp3QuranCardEditor extends HTMLElement {
     });
     ui.advanceInput.addEventListener("change", () => {
       this._commit({ auto_advance: ui.advanceInput.checked });
+    });
+    ui.loopInput.addEventListener("change", () => {
+      this._commit({ loop: ui.loopInput.checked });
     });
   }
 

@@ -153,6 +153,58 @@ async def test_end_of_quran_stops(hass) -> None:
 
 
 @pytest.mark.asyncio
+async def test_loop_restarts_at_first_surah(hass) -> None:
+    manager, reciter, moshaf = _manager(hass)
+    entity_id = "media_player.office"
+    session = await manager.async_start(
+        entity_id,
+        reciter,
+        moshaf,
+        3,
+        auto_advance=True,
+        surah_repeat=1,
+        loop=True,
+    )
+    await manager._async_advance(session)
+    assert session.surah == 1
+    assert session.expected_url.endswith("/001.mp3")
+    assert manager.get_session(entity_id) is session
+    await manager.async_skip(entity_id, step=1)
+    await manager.async_skip(entity_id, step=1)
+    await manager.async_skip(entity_id, step=1)
+    assert session.surah == 1
+
+
+@pytest.mark.asyncio
+async def test_loop_without_auto_advance_only_wraps_at_end(hass) -> None:
+    manager, reciter, moshaf = _manager(hass)
+    entity_id = "media_player.hall"
+    middle = await manager.async_start(
+        entity_id,
+        reciter,
+        moshaf,
+        2,
+        auto_advance=False,
+        surah_repeat=1,
+        loop=True,
+    )
+    await manager._async_advance(middle)
+    assert manager.get_session(entity_id) is None
+
+    last = await manager.async_start(
+        entity_id,
+        reciter,
+        moshaf,
+        3,
+        auto_advance=False,
+        surah_repeat=1,
+        loop=True,
+    )
+    await manager._async_advance(last)
+    assert last.surah == 1
+
+
+@pytest.mark.asyncio
 async def test_attach_from_url(hass) -> None:
     manager, _, moshaf = _manager(hass)
     url = moshaf.audio_url(2)
