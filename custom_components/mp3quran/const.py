@@ -11,6 +11,7 @@ DEFAULT_UPDATE_INTERVAL_HOURS = 24
 CONF_DISPLAY_LANGUAGE = "display_language"
 CONF_SORT_LANGUAGE = "sort_language"  # legacy alias
 CONF_SURAH_REPEAT = "surah_repeat"
+CONF_FAVORITE_RECITERS = "favorite_reciters"
 # Legacy option key (removed from UI; ignored if still present in storage).
 CONF_AUTO_ADVANCE = "auto_advance"
 
@@ -55,6 +56,22 @@ ID_MOSHAF = "moshaf"
 ID_SURAH = "surah"
 
 PLATFORMS = ["sensor", "button"]
+
+
+def get_favorite_reciter_ids(options: dict) -> list[int]:
+    """Return saved favorite reciter ids."""
+    raw = options.get(CONF_FAVORITE_RECITERS) or []
+    if isinstance(raw, (str, int)):
+        raw = [raw]
+    ids: list[int] = []
+    for item in raw:
+        try:
+            number = int(item)
+        except (TypeError, ValueError):
+            continue
+        if number not in ids:
+            ids.append(number)
+    return ids
 
 
 def get_display_language(options: dict) -> str:

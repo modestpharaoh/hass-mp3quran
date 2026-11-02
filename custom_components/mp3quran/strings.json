@@ -6,11 +6,13 @@
         "description": "Browse Quran recitations from mp3quran.net in the Home Assistant media browser.",
         "data": {
           "display_language": "Display language",
-          "surah_repeat": "Default surah repeat"
+          "surah_repeat": "Default surah repeat",
+          "favorite_reciters": "Favorite reciters"
         },
         "data_description": {
           "display_language": "Language used for reciter, moshaf, and surah names in Media Browser. Sorting follows this language.",
-          "surah_repeat": "Default times to play each surah before advancing when using mp3quran.play (1-20). Auto-advance itself defaults to off unless enabled on the action."
+          "surah_repeat": "Default times to play each surah before advancing when using mp3quran.play (1-20). Auto-advance itself defaults to off unless enabled on the action.",
+          "favorite_reciters": "Shown at the top of the MP3 Quran media source. Available after the reciter catalog has loaded."
         }
       }
     },
@@ -24,11 +26,13 @@
         "title": "MP3 Quran options",
         "data": {
           "display_language": "Display language",
-          "surah_repeat": "Default surah repeat"
+          "surah_repeat": "Default surah repeat",
+          "favorite_reciters": "Favorite reciters"
         },
         "data_description": {
           "display_language": "Language used for reciter, moshaf, and surah names in Media Browser. Sorting follows this language.",
-          "surah_repeat": "Default times to play each surah before advancing when using mp3quran.play (1-20). Auto-advance itself defaults to off unless enabled on the action."
+          "surah_repeat": "Default times to play each surah before advancing when using mp3quran.play (1-20). Auto-advance itself defaults to off unless enabled on the action.",
+          "favorite_reciters": "Shown at the top of the MP3 Quran media source. Available after the reciter catalog has loaded."
         }
       }
     }

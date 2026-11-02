@@ -51,6 +51,7 @@ Configure under the integration’s **Configure** menu:
 |--------|-------------|---------|
 | Display language | `english` or `arabic` (names + sort order) | english |
 | Default surah repeat | Times to play each surah when using `mp3quran.play` (1–20) | 1 |
+| Favorite reciters | Pinned to the top of the media source with a star | none |
 
 Auto-advance is **not** an integration option. Enable it per call on `mp3quran.play` (defaults to off).
 

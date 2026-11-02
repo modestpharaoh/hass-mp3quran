@@ -28,7 +28,7 @@ class Mp3QuranActiveSessionsSensor(SensorEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "active_sessions"
-    _attr_icon = "mdi:book-music"
+    _attr_icon = "mdi:book-open-variant"
 
     def __init__(self, entry: ConfigEntry, sessions: Any) -> None:
         """Initialize the sensor."""

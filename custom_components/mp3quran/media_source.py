@@ -21,6 +21,7 @@ from .const import (
     ID_SURAH,
     MIME_TYPE_MP3,
     get_display_language,
+    get_favorite_reciter_ids,
 )
 from .coordinator import Mp3QuranCoordinator
 
@@ -122,19 +123,28 @@ class Mp3QuranMediaSource(MediaSource):
         return self._browse_surahs(catalog, reciter, moshaf, language)
 
     def _browse_root(self, catalog: Catalog, language: str) -> BrowseMediaSource:
-        children = [
-            BrowseMediaSource(
-                domain=DOMAIN,
-                identifier=f"{ID_RECITER}/{reciter.id}",
-                media_class=MediaClass.DIRECTORY,
-                media_content_type=MediaType.MUSIC,
-                title=reciter.browse_title(language),
-                can_play=False,
-                can_expand=True,
-                children_media_class=MediaClass.DIRECTORY,
+        favorites = set(get_favorite_reciter_ids(self.entry.options))
+        reciters = sorted(
+            catalog.sorted_reciters(language),
+            key=lambda reciter: reciter.id not in favorites,
+        )
+        children = []
+        for reciter in reciters:
+            title = reciter.browse_title(language)
+            if reciter.id in favorites:
+                title = f"★ {title}"
+            children.append(
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=f"{ID_RECITER}/{reciter.id}",
+                    media_class=MediaClass.DIRECTORY,
+                    media_content_type=MediaType.MUSIC,
+                    title=title,
+                    can_play=False,
+                    can_expand=True,
+                    children_media_class=MediaClass.DIRECTORY,
+                )
             )
-            for reciter in catalog.sorted_reciters(language)
-        ]
         return BrowseMediaSource(
             domain=DOMAIN,
             identifier=None,

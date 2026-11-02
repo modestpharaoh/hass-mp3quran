@@ -37,6 +37,7 @@ async def test_user_step_creates_entry() -> None:
     assert result["options"][CONF_DISPLAY_LANGUAGE] == "arabic"
     assert CONF_SURAH_REPEAT in result["options"]
     assert result["options"][CONF_SURAH_REPEAT] == 3
+    assert result["options"]["favorite_reciters"] == []
     assert "auto_advance" not in result["options"]
 
 
