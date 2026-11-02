@@ -88,6 +88,22 @@ Or press the matching **Stop MP3 Quran (...)** button entity created when a sess
 - `sensor.mp3quran_active_sessions` — count of active continuous sessions; attributes list each player’s reciter/moshaf/surah.
 - Per-player stop buttons remain available after a session ends for that Home Assistant run.
 
+### Dashboard card
+
+The integration registers a Lovelace card. After a restart, add **MP3 Quran** from the card picker, or paste:
+
+```yaml
+type: custom:mp3quran-card
+entity: media_player.living_room
+reciter_id: 102
+moshaf_id: 102
+surah: 1
+surah_repeat: 1
+auto_advance: false
+```
+
+Every field except `type` is an optional starting value. The card shows the MP3 Quran icon, the current surah, and the reciter and moshaf above the media player selector. You can set that player’s volume, then choose the reciter, moshaf (only when that reciter has more than one), starting surah, repeat count, and whether to advance. **Play** calls `mp3quran.play`. **Stop** calls `mp3quran.stop`. Names follow the integration display language, and favorite reciters stay at the top. While that player has a session, the surah and reciter lines follow the active session.
+
 ### Metadata
 
 When playing via `mp3quran.play`, the integration sends Cast-style `extra.metadata` (title/artist) and uses `media_content_type: audio/mpeg` (same as Media Browser).

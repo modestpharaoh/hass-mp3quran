@@ -57,6 +57,8 @@ ID_SURAH = "surah"
 
 PLATFORMS = ["sensor", "button"]
 
+CARD_URL = "/mp3quran/mp3quran-card.js"
+
 
 def get_favorite_reciter_ids(options: dict) -> list[int]:
     """Return saved favorite reciter ids."""

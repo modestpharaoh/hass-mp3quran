@@ -55,6 +55,8 @@ def _ensure_ha_stubs() -> None:
             self.services.async_remove = MagicMock()
             self.services.async_call = AsyncMock()
             self.config_entries = MagicMock()
+            self.http = MagicMock()
+            self.http.async_register_static_paths = AsyncMock()
 
     def callback(func):
         return func
@@ -358,6 +360,26 @@ def _ensure_ha_stubs() -> None:
     ha_ms.PlayMedia = PlayMedia
     ha_ms.Unresolvable = Unresolvable
     sys.modules["homeassistant.components.media_source"] = ha_ms
+
+    ha_frontend = types.ModuleType("homeassistant.components.frontend")
+
+    def add_extra_js_url(_hass, url):
+        add_extra_js_url.calls.append(url)
+
+    add_extra_js_url.calls = []
+    ha_frontend.add_extra_js_url = add_extra_js_url
+    sys.modules["homeassistant.components.frontend"] = ha_frontend
+
+    ha_http = types.ModuleType("homeassistant.components.http")
+
+    class StaticPathConfig:
+        def __init__(self, url_path, path, cache_headers=True):
+            self.url_path = url_path
+            self.path = path
+            self.cache_headers = cache_headers
+
+    ha_http.StaticPathConfig = StaticPathConfig
+    sys.modules["homeassistant.components.http"] = ha_http
 
 
 _ensure_ha_stubs()
