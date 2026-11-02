@@ -1,8 +1,10 @@
 const ROOT_ID = "media-source://mp3quran";
 const BRAND_ICON = "/mp3quran_brand/icon.png";
+const PAUSE = 1;
 const SEEK = 2;
 const VOLUME_SET = 4;
 const VOLUME_STEP = 1024;
+const PLAY = 16384;
 
 const STRINGS = {
   en: {
@@ -15,6 +17,10 @@ const STRINGS = {
     repeat: "Surah repeat",
     advance: "Advance to next surah",
     play: "Play",
+    pause: "Pause",
+    resume: "Resume",
+    previous: "Previous surah",
+    next: "Next surah",
     stop: "Stop",
     pick: "Select",
     loading: "Loading…",
@@ -40,6 +46,10 @@ const STRINGS = {
     repeat: "تكرار السورة",
     advance: "الانتقال إلى السورة التالية",
     play: "تشغيل",
+    pause: "إيقاف مؤقت",
+    resume: "استئناف",
+    previous: "السورة السابقة",
+    next: "السورة التالية",
     stop: "إيقاف",
     pick: "اختر",
     loading: "جارٍ التحميل…",
@@ -291,6 +301,30 @@ const STYLE = `
     cursor: pointer;
     background: transparent;
   }
+  .transport {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 14px;
+  }
+  .transport button {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.16);
+    color: #f4fbff;
+  }
+  .transport button.pause {
+    flex-basis: 52px;
+    width: 52px;
+    height: 52px;
+    background: #f4fbff;
+    color: #0c2a34;
+  }
+  .transport button[hidden] { display: none; }
   ha-icon { --mdc-icon-size: 20px; }
   .body { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 16px; }
   label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--secondary-text-color); }
@@ -404,6 +438,10 @@ function buildShell(chrome) {
   let reciterLine = null;
   let statePill = null;
   let progress = null;
+  let previous = null;
+  let pause = null;
+  let pauseIcon = null;
+  let next = null;
   let volume = null;
 
   if (chrome) {
@@ -445,7 +483,15 @@ function buildShell(chrome) {
     total.className = "time end";
     progressRow.append(elapsed, track, seek, total);
     progress = { row: progressRow, elapsed, track, fill, seek, total };
-    stage.append(brandImage("art"), surahLine, reciterLine, statePill, progressRow);
+    const transport = document.createElement("div");
+    transport.className = "transport";
+    previous = iconButton("jump", "mdi:skip-previous");
+    pause = iconButton("pause", "mdi:pause");
+    pause.hidden = true;
+    pauseIcon = pause.querySelector("ha-icon");
+    next = iconButton("jump", "mdi:skip-next");
+    transport.append(previous, pause, next);
+    stage.append(brandImage("art"), surahLine, reciterLine, statePill, progressRow, transport);
 
     const row = document.createElement("div");
     row.className = "volume";
@@ -521,6 +567,10 @@ function buildShell(chrome) {
     reciterLine,
     statePill,
     progress,
+    previous,
+    pause,
+    pauseIcon,
+    next,
     volume,
     player,
     reciter,
@@ -661,6 +711,9 @@ class Mp3QuranCard extends HTMLElement {
       this._autoAdvance = ui.advanceInput.checked;
     });
     ui.play.addEventListener("click", () => this._play());
+    ui.previous.addEventListener("click", () => this._skip(-1));
+    ui.pause.addEventListener("click", () => this._pauseToggle());
+    ui.next.addEventListener("click", () => this._skip(1));
     ui.stop.addEventListener("click", () => this._stop());
     ui.volume.down.addEventListener("click", () => this._nudgeVolume(-1));
     ui.volume.up.addEventListener("click", () => this._nudgeVolume(1));
@@ -698,6 +751,8 @@ class Mp3QuranCard extends HTMLElement {
     ui.title.textContent = text.title;
     ui.volume.down.setAttribute("aria-label", text.volumeDown);
     ui.volume.up.setAttribute("aria-label", text.volumeUp);
+    ui.previous.setAttribute("aria-label", text.previous);
+    ui.next.setAttribute("aria-label", text.next);
     ui.player.text.textContent = text.player;
     ui.reciter.text.textContent = text.reciter;
     ui.moshaf.text.textContent = text.moshaf;
@@ -739,6 +794,7 @@ class Mp3QuranCard extends HTMLElement {
     const text = strings(this._hass);
     const ui = this._ui;
     this._paintNow();
+    this._paintTransport();
     this._paintProgress();
     this._paintVolume();
     ui.status.classList.toggle("error", Boolean(this._error));
@@ -771,6 +827,31 @@ class Mp3QuranCard extends HTMLElement {
       ui.statePill.hidden = true;
       ui.statePill.textContent = "";
     }
+  }
+
+  _paintTransport() {
+    const text = strings(this._hass);
+    const ui = this._ui;
+    const player = this._hass && this._entity ? this._hass.states[this._entity] : null;
+    const state = player && player.state;
+    const features = Number((player && player.attributes && player.attributes.supported_features) || 0);
+    const playing = state === "playing" || state === "buffering";
+    const showPause = playing && (features & PAUSE) !== 0;
+    const showResume = state === "paused" && (features & PLAY) !== 0;
+    const visible = showPause || showResume;
+    ui.pause.hidden = !visible;
+    ui.pause.disabled = !visible;
+    const icon = showResume ? "mdi:play" : "mdi:pause";
+    ui.pauseIcon.icon = icon;
+    ui.pauseIcon.setAttribute("icon", icon);
+    ui.pause.setAttribute("aria-label", showResume ? text.resume : text.pause);
+    const session = sessionFor(this._hass, this._entity);
+    const current = session ? Number(session.surah) : this._surah;
+    const index = this._surahs.findIndex((item) => item.id === current);
+    const known = index !== -1;
+    ui.previous.disabled = !this._entity || (known ? index <= 0 : !session);
+    ui.next.disabled =
+      !this._entity || (known ? index >= this._surahs.length - 1 : !session);
   }
 
   _paintProgress() {
@@ -1076,6 +1157,51 @@ class Mp3QuranCard extends HTMLElement {
       this._error = errorText(err, text.error);
     }
     this._paintStatus();
+  }
+
+  async _skip(direction) {
+    if (!this._entity) return;
+    const text = strings(this._hass);
+    const session = sessionFor(this._hass, this._entity);
+    this._error = "";
+    try {
+      if (session) {
+        await this._hass.callService(
+          "mp3quran",
+          direction > 0 ? "next_surah" : "previous_surah",
+          {},
+          { entity_id: this._entity }
+        );
+        return;
+      }
+      const index = this._surahs.findIndex((item) => item.id === this._surah);
+      const neighbor = index === -1 ? null : this._surahs[index + direction];
+      if (!neighbor) return;
+      this._surah = neighbor.id;
+      this._paintSelections();
+      await this._play();
+    } catch (err) {
+      this._error = errorText(err, text.error);
+      this._paintStatus();
+    }
+  }
+
+  async _pauseToggle() {
+    if (!this._entity) return;
+    const player = this._hass.states[this._entity];
+    const resume = player && player.state === "paused";
+    this._error = "";
+    try {
+      await this._hass.callService(
+        "media_player",
+        resume ? "media_play" : "media_pause",
+        {},
+        { entity_id: this._entity }
+      );
+    } catch (err) {
+      this._error = errorText(err, strings(this._hass).error);
+      this._paintStatus();
+    }
   }
 
   async _stop() {

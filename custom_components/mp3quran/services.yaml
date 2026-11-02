@@ -54,3 +54,17 @@ stop:
   target:
     entity:
       domain: media_player
+
+next_surah:
+  name: Next surah
+  description: Play the next surah in the active MP3 Quran session. Repeat count starts over for that surah.
+  target:
+    entity:
+      domain: media_player
+
+previous_surah:
+  name: Previous surah
+  description: Play the previous surah in the active MP3 Quran session. Repeat count starts over for that surah.
+  target:
+    entity:
+      domain: media_player

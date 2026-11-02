@@ -43,6 +43,42 @@ def _manager(hass) -> tuple[PlaybackSessionManager, Reciter, Moshaf]:
 
 
 @pytest.mark.asyncio
+async def test_skip_moves_between_surahs(hass) -> None:
+    manager, reciter, moshaf = _manager(hass)
+    entity_id = "media_player.living_room"
+    session = await manager.async_start(
+        entity_id,
+        reciter,
+        moshaf,
+        2,
+        auto_advance=True,
+        surah_repeat=3,
+        play=False,
+    )
+    hass.services.async_call.reset_mock()
+
+    await manager.async_skip(entity_id, step=1)
+    assert session.surah == 3
+    assert session.plays_remaining == 3
+    assert session.user_interrupted is False
+    played = [
+        call.args[2]["media_content_id"]
+        for call in hass.services.async_call.await_args_list
+        if call.args[1] == "play_media"
+    ]
+    assert played[-1].endswith("003.mp3")
+
+    await manager.async_skip(entity_id, step=-1)
+    assert session.surah == 2
+    await manager.async_skip(entity_id, step=-1)
+    assert session.surah == 1
+    with pytest.raises(ValueError, match="no previous"):
+        await manager.async_skip(entity_id, step=-1)
+    with pytest.raises(ValueError, match="No active"):
+        await manager.async_skip("media_player.other", step=1)
+
+
+@pytest.mark.asyncio
 async def test_repeat_then_advance(hass) -> None:
     manager, reciter, moshaf = _manager(hass)
     entity_id = "media_player.living_room"
@@ -247,6 +283,41 @@ async def test_user_stop_service_prevents_advance(hass) -> None:
     )
     assert manager.get_session(entity_id) is None
     assert hass.services.async_call.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_resume_clears_pause_interrupt(hass) -> None:
+    manager, reciter, moshaf = _manager(hass)
+    entity_id = "media_player.cast"
+    session = await manager.async_start(
+        entity_id,
+        reciter,
+        moshaf,
+        1,
+        auto_advance=True,
+        surah_repeat=1,
+        play=False,
+    )
+    await manager._async_on_call_service(
+        Event(
+            {
+                "domain": "media_player",
+                "service": "media_pause",
+                "service_data": {"entity_id": entity_id},
+            }
+        )
+    )
+    assert session.user_interrupted is True
+    await manager._async_on_call_service(
+        Event(
+            {
+                "domain": "media_player",
+                "service": "media_play",
+                "service_data": {"entity_id": entity_id},
+            }
+        )
+    )
+    assert session.user_interrupted is False
 
 
 @pytest.mark.asyncio

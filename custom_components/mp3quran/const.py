@@ -46,6 +46,8 @@ ATTR_ENTITY_ID = "entity_id"
 
 SERVICE_PLAY = "play"
 SERVICE_STOP = "stop"
+SERVICE_NEXT_SURAH = "next_surah"
+SERVICE_PREVIOUS_SURAH = "previous_surah"
 
 MIME_TYPE_MP3 = "audio/mpeg"
 MEDIA_TYPE_MUSIC = "music"

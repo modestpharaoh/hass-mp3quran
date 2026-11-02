@@ -56,6 +56,17 @@ async def test_play_defaults_auto_advance_off(hass) -> None:
     assert session is not None
     assert session.auto_advance is False
     assert session.surah_repeat == 2
+    handlers = {
+        call.args[1]: call.args[2] for call in hass.services.async_register.call_args_list
+    }
+    await handlers["next_surah"](
+        SimpleNamespace(data={"entity_id": "media_player.living_room"})
+    )
+    assert session.surah == 2
+    with pytest.raises(HomeAssistantError, match="no next"):
+        await handlers["next_surah"](
+            SimpleNamespace(data={"entity_id": "media_player.living_room"})
+        )
 
 
 @pytest.mark.asyncio

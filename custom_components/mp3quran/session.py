@@ -350,15 +350,23 @@ class PlaybackSessionManager:
         """Mark sessions interrupted when HA stops/pauses/turns off a player."""
         domain = event.data.get("domain")
         service = event.data.get("service")
-        if domain != MEDIA_PLAYER_DOMAIN or service not in _USER_STOP_SERVICES:
+        if domain != MEDIA_PLAYER_DOMAIN:
             return
-        # Ignore stops we initiated ourselves while clearing a session.
         service_data = event.data.get("service_data") or {}
         entity_ids = service_data.get(ATTR_ENTITY_ID)
         if entity_ids is None:
             return
         if isinstance(entity_ids, str):
             entity_ids = [entity_ids]
+        if service == "media_play":
+            for entity_id in entity_ids:
+                session = self._sessions.get(entity_id)
+                if session is not None:
+                    session.user_interrupted = False
+            return
+        if service not in _USER_STOP_SERVICES:
+            return
+        # Ignore stops we initiated ourselves while clearing a session.
         for entity_id in entity_ids:
             if entity_id in self._stopping or entity_id in self._advancing:
                 continue
@@ -557,6 +565,57 @@ class PlaybackSessionManager:
             self._notify_listeners()
         finally:
             self._advancing.discard(session.entity_id)
+
+    async def async_skip(self, entity_id: str, *, step: int) -> None:
+        """Jump the active session to the next or previous surah and play it."""
+        session = self._sessions.get(entity_id)
+        if session is None or not session.active:
+            raise ValueError("No active MP3 Quran session on this media player")
+        if entity_id in self._advancing:
+            return
+
+        catalog = self.catalog
+        if catalog is None:
+            raise ValueError("MP3 Quran catalog is not ready")
+        reciter = catalog.get_reciter(session.reciter_id)
+        if reciter is None:
+            raise ValueError("Reciter for this session is no longer available")
+        moshaf = reciter.get_moshaf(session.moshaf_id)
+        if moshaf is None:
+            raise ValueError("Moshaf for this session is no longer available")
+
+        target = (
+            moshaf.next_surah(session.surah)
+            if step > 0
+            else moshaf.previous_surah(session.surah)
+        )
+        if target is None:
+            edge = "next" if step > 0 else "previous"
+            raise ValueError(f"This moshaf has no {edge} surah")
+
+        self._advancing.add(entity_id)
+        try:
+            url, title, artist = self._metadata_for(reciter, moshaf, target)
+            session.surah = target
+            session.expected_url = url
+            session.title = title
+            session.artist = artist
+            session.plays_remaining = session.surah_repeat
+            session.user_interrupted = False
+            session.last_position = None
+            session.last_duration = None
+            session.max_position = 0.0
+            session.pending_play = True
+            await self._async_play_url(
+                entity_id,
+                url,
+                title=title,
+                artist=artist,
+                blocking=False,
+            )
+            self._notify_listeners()
+        finally:
+            self._advancing.discard(entity_id)
 
     async def _async_clear_playlist(self, entity_id: str) -> None:
         """Clear a player playlist when supported.

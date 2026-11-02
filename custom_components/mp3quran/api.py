@@ -46,6 +46,15 @@ class Moshaf:
                 return candidate
         return None
 
+    def previous_surah(self, surah: int) -> int | None:
+        """Return the previous available surah before the given one, or None."""
+        previous = None
+        for candidate in self.surah_list:
+            if candidate >= surah:
+                break
+            previous = candidate
+        return previous
+
     def localized_name(self, language: str = "english") -> str:
         """Return the moshaf name in the requested language."""
         if language == "arabic":

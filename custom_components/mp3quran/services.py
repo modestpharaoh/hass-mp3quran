@@ -25,7 +25,9 @@ from .const import (
     DOMAIN,
     MAX_SURAH_REPEAT,
     MIN_SURAH_REPEAT,
+    SERVICE_NEXT_SURAH,
     SERVICE_PLAY,
+    SERVICE_PREVIOUS_SURAH,
     SERVICE_STOP,
 )
 from .coordinator import Mp3QuranCoordinator
@@ -146,6 +148,22 @@ def async_register_services(
         for entity_id in await _entity_ids(call):
             await sessions.async_stop(entity_id, stop_media=True)
 
+    async def _handle_skip(call: ServiceCall, step: int) -> None:
+        """Move each targeted session to the neighboring surah."""
+        for entity_id in await _entity_ids(call):
+            try:
+                await sessions.async_skip(entity_id, step=step)
+            except ValueError as err:
+                raise HomeAssistantError(str(err)) from err
+
+    async def async_handle_next(call: ServiceCall) -> None:
+        """Play the next surah in the active session."""
+        await _handle_skip(call, 1)
+
+    async def async_handle_previous(call: ServiceCall) -> None:
+        """Play the previous surah in the active session."""
+        await _handle_skip(call, -1)
+
     if not hass.services.has_service(DOMAIN, SERVICE_PLAY):
         hass.services.async_register(
             DOMAIN,
@@ -158,6 +176,20 @@ def async_register_services(
             DOMAIN,
             SERVICE_STOP,
             async_handle_stop,
+            schema=STOP_SCHEMA,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_NEXT_SURAH):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_NEXT_SURAH,
+            async_handle_next,
+            schema=STOP_SCHEMA,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_PREVIOUS_SURAH):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_PREVIOUS_SURAH,
+            async_handle_previous,
             schema=STOP_SCHEMA,
         )
 
@@ -211,6 +243,11 @@ def _media_players_from_registry(hass: HomeAssistant, data: dict[str, Any]) -> s
 
 def async_unregister_services(hass: HomeAssistant) -> None:
     """Unregister domain services when the last entry unloads."""
-    for service in (SERVICE_PLAY, SERVICE_STOP):
+    for service in (
+        SERVICE_PLAY,
+        SERVICE_STOP,
+        SERVICE_NEXT_SURAH,
+        SERVICE_PREVIOUS_SURAH,
+    ):
         if hass.services.has_service(DOMAIN, service):
             hass.services.async_remove(DOMAIN, service)
