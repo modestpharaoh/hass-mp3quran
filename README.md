@@ -14,8 +14,9 @@ Play any of the 114 surahs by many reciters on any media player (VLC, Cast, brow
 - **IDs in Media Browser** — reciter and moshaf titles include their mp3quran.net IDs for easy service calls
 - **Surah details** — number, localized name, Makki/Madani, ayah count
 - **Incomplete moshafs** — only available surahs are listed
-- **Continuous playback** — optional auto-advance to the next surah
+- **Continuous playback** — optional auto-advance via `mp3quran.play` (defaults **off**)
 - **Surah repeat** — play each surah N times before advancing
+- **Session visibility** — `sensor.mp3quran_active_sessions` plus per-player stop buttons
 - **HACS ready** — install as a custom repository
 
 ## Install (HACS)
@@ -49,12 +50,14 @@ Configure under the integration’s **Configure** menu:
 | Option | Description | Default |
 |--------|-------------|---------|
 | Display language | `english` or `arabic` (names + sort order) | english |
-| Auto-play next surah | Advance when the current surah ends | on |
-| Repeat each surah | Times to play each surah before advancing (1–20) | 1 |
+| Default surah repeat | Times to play each surah when using `mp3quran.play` (1–20) | 1 |
+| Favorite reciters | Pinned to the top of the media source with a star | none |
+
+Auto-advance is **not** an integration option. Enable it per call on `mp3quran.play` (defaults to off).
 
 ### Continuous play service
 
-Media Browser alone plays one URL. For reliable auto-advance / repeat on VLC, Cast, and similar players, use the service:
+Media Browser alone plays one URL. For continuous listening, use:
 
 ```yaml
 action: mp3quran.play
@@ -68,7 +71,9 @@ data:
   surah_repeat: 1
 ```
 
-Stop tracking a continuous session:
+You can also target a **device** that includes a `media_player` entity; the integration resolves it to media players.
+
+Stop a session **and** the current audio:
 
 ```yaml
 action: mp3quran.stop
@@ -76,7 +81,46 @@ target:
   entity_id: media_player.living_room
 ```
 
-When auto-advance is enabled, playing a known mp3quran URL from Media Browser will also attach a session so the next surah can continue on that player.
+Or press the matching **Stop MP3 Quran (...)** button entity created when a session starts on that player.
+
+### Session status
+
+- `sensor.mp3quran_active_sessions` — count of active continuous sessions; attributes list each player’s reciter/moshaf/surah.
+- Per-player stop buttons remain available after a session ends for that Home Assistant run.
+
+### Dashboard card
+
+![MP3 Quran card](docs/mp3quran-card.png)
+
+The integration registers a Lovelace card. After a restart, add **MP3 Quran** from the card picker, or paste:
+
+```yaml
+type: custom:mp3quran-card
+entity: media_player.living_room
+reciter_id: 102
+moshaf_id: 102
+surah: 1
+surah_repeat: 1
+auto_advance: false
+```
+
+Every field except `type` is an optional starting value. The card shows the MP3 Quran icon, the current surah, and the reciter and moshaf above the media player selector. You can set that player’s volume, then choose the reciter, moshaf (only when that reciter has more than one), starting surah, repeat count, and whether to advance. **Play** calls `mp3quran.play`. **Stop** calls `mp3quran.stop`. Names follow the integration display language, and favorite reciters stay at the top. While that player has a session, the surah and reciter lines follow the active session.
+
+### Metadata
+
+When playing via `mp3quran.play`, the integration sends Cast-style `extra.metadata` (title/artist) and uses `media_content_type: audio/mpeg` (same as Media Browser).
+
+| Player | Metadata display | Notes |
+|--------|------------------|-------|
+| Chromecast / Cast | Usually works | Title/artist via Cast metadata |
+| VLC | **Not supported** | VLC HA integration ignores `extra` and shows the MP3 filename |
+| ESPHome speaker | **Not supported** | No metadata path for URL streams |
+
+### Mid-track stop vs auto-advance
+
+- Players that report `media_position` / `media_duration` (e.g. VLC): mid-track stop clears the session and does **not** advance.
+- Stopping via Home Assistant (`media_player.media_stop` / turn off / pause) marks the session interrupted even when progress is unavailable.
+- Players with **no** progress reporting (many ESPHome speakers): if you stop outside HA (device button / other path) with no stop service call, the integration cannot reliably tell mid-stop from end-of-track, so auto-advance may still continue. Use `mp3quran.stop` or the stop button for a guaranteed stop.
 
 ## Example automation
 
@@ -97,6 +141,22 @@ actions:
       auto_advance: false
       surah_repeat: 1
 ```
+
+## Changelog
+
+### 1.4.1
+
+Changes since [1.1.0](https://github.com/modestpharaoh/hass-mp3quran/releases/tag/v1.1.0).
+
+- **Dashboard card** — pick a media player, reciter, moshaf, starting surah, repeat count, and auto-advance. The card shows the MP3 Quran icon, the current surah, and the reciter and moshaf, and it can raise or lower that player’s volume.
+- **Favorite reciters** — pin reciters in the integration options. They sort to the top of the media source and are marked with a star.
+- **Auto-advance** — defaults to off, and is chosen on each `mp3quran.play` call.
+- **Targets** — `mp3quran.play` and `mp3quran.stop` accept a media player entity, or a device or area that includes one.
+- **Stop** — `mp3quran.stop` clears the session and stops the audio. Stopping mid-surah does not advance.
+- **Sessions** — `sensor.mp3quran_active_sessions` counts continuous sessions. A stop button is added for each player that has had a session. The sensor icon is a book.
+- **Players** — Chromecast shows the surah, reciter, and moshaf, and it advances when the surah ends. VLC’s playlist is cleared before each surah.
+
+The same notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Development
 

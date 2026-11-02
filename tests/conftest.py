@@ -36,7 +36,9 @@ def _ensure_ha_stubs() -> None:
     ha_const.STATE_IDLE = "idle"
     ha_const.STATE_OFF = "off"
     ha_const.STATE_UNAVAILABLE = "unavailable"
-    ha_const.Platform = types.SimpleNamespace()
+    ha_const.EVENT_CALL_SERVICE = "call_service"
+    ha_const.SERVICE_TURN_OFF = "turn_off"
+    ha_const.Platform = types.SimpleNamespace(SENSOR="sensor", BUTTON="button")
     sys.modules["homeassistant.const"] = ha_const
 
     # core
@@ -53,6 +55,8 @@ def _ensure_ha_stubs() -> None:
             self.services.async_remove = MagicMock()
             self.services.async_call = AsyncMock()
             self.config_entries = MagicMock()
+            self.http = MagicMock()
+            self.http.async_register_static_paths = AsyncMock()
 
     def callback(func):
         return func
@@ -185,6 +189,14 @@ def _ensure_ha_stubs() -> None:
     ha_aiohttp.async_get_clientsession = MagicMock()
     sys.modules["homeassistant.helpers.aiohttp_client"] = ha_aiohttp
 
+    ha_er = types.ModuleType("homeassistant.helpers.entity_registry")
+
+    def _async_get_registry(_hass):
+        raise RuntimeError("no registry in tests")
+
+    ha_er.async_get = _async_get_registry
+    sys.modules["homeassistant.helpers.entity_registry"] = ha_er
+
     ha_service = types.ModuleType("homeassistant.helpers.service")
 
     async def async_extract_entity_ids(hass, call):
@@ -264,8 +276,11 @@ def _ensure_ha_stubs() -> None:
     ha_mp = types.ModuleType("homeassistant.components.media_player")
     ha_mp.ATTR_MEDIA_CONTENT_ID = "media_content_id"
     ha_mp.ATTR_MEDIA_CONTENT_TYPE = "media_content_type"
+    ha_mp.ATTR_MEDIA_DURATION = "media_duration"
+    ha_mp.ATTR_MEDIA_POSITION = "media_position"
     ha_mp.DOMAIN = "media_player"
     ha_mp.SERVICE_PLAY_MEDIA = "play_media"
+    ha_mp.SERVICE_MEDIA_STOP = "media_stop"
     ha_mp.MediaClass = types.SimpleNamespace(
         CHANNEL="channel",
         DIRECTORY="directory",
@@ -274,7 +289,7 @@ def _ensure_ha_stubs() -> None:
     )
     ha_mp.MediaType = types.SimpleNamespace(MUSIC="music")
     ha_mp.MediaPlayerState = types.SimpleNamespace(
-        PLAYING="playing", IDLE="idle", OFF="off"
+        PLAYING="playing", IDLE="idle", OFF="off", PAUSED="paused"
     )
 
     class BrowseError(Exception):
@@ -283,6 +298,38 @@ def _ensure_ha_stubs() -> None:
     ha_mp.BrowseError = BrowseError
     sys.modules["homeassistant.components"] = types.ModuleType("homeassistant.components")
     sys.modules["homeassistant.components.media_player"] = ha_mp
+
+    # device_registry helpers used by sensor/button
+    ha_dr = types.ModuleType("homeassistant.helpers.device_registry")
+    ha_dr.DeviceEntryType = types.SimpleNamespace(SERVICE="service")
+
+    def DeviceInfo(**kwargs):
+        return kwargs
+
+    ha_dr.DeviceInfo = DeviceInfo
+    sys.modules["homeassistant.helpers.device_registry"] = ha_dr
+
+    ha_sensor = types.ModuleType("homeassistant.components.sensor")
+
+    class SensorEntity:
+        def async_write_ha_state(self):
+            pass
+
+    ha_sensor.SensorEntity = SensorEntity
+    sys.modules["homeassistant.components.sensor"] = ha_sensor
+
+    ha_button = types.ModuleType("homeassistant.components.button")
+
+    class ButtonEntity:
+        def async_write_ha_state(self):
+            pass
+
+    ha_button.ButtonEntity = ButtonEntity
+    sys.modules["homeassistant.components.button"] = ha_button
+
+    ha_ep = types.ModuleType("homeassistant.helpers.entity_platform")
+    ha_ep.AddEntitiesCallback = object
+    sys.modules["homeassistant.helpers.entity_platform"] = ha_ep
 
     # media_source
     ha_ms = types.ModuleType("homeassistant.components.media_source")
@@ -313,6 +360,26 @@ def _ensure_ha_stubs() -> None:
     ha_ms.PlayMedia = PlayMedia
     ha_ms.Unresolvable = Unresolvable
     sys.modules["homeassistant.components.media_source"] = ha_ms
+
+    ha_frontend = types.ModuleType("homeassistant.components.frontend")
+
+    def add_extra_js_url(_hass, url):
+        add_extra_js_url.calls.append(url)
+
+    add_extra_js_url.calls = []
+    ha_frontend.add_extra_js_url = add_extra_js_url
+    sys.modules["homeassistant.components.frontend"] = ha_frontend
+
+    ha_http = types.ModuleType("homeassistant.components.http")
+
+    class StaticPathConfig:
+        def __init__(self, url_path, path, cache_headers=True):
+            self.url_path = url_path
+            self.path = path
+            self.cache_headers = cache_headers
+
+    ha_http.StaticPathConfig = StaticPathConfig
+    sys.modules["homeassistant.components.http"] = ha_http
 
 
 _ensure_ha_stubs()

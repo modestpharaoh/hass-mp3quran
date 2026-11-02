@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import voluptuous as vol
 
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service import async_extract_entity_ids
 
 from .const import (
@@ -16,7 +19,6 @@ from .const import (
     ATTR_RECITER_ID,
     ATTR_SURAH,
     ATTR_SURAH_REPEAT,
-    CONF_AUTO_ADVANCE,
     CONF_SURAH_REPEAT,
     DEFAULT_AUTO_ADVANCE,
     DEFAULT_SURAH_REPEAT,
@@ -29,28 +31,29 @@ from .const import (
 from .coordinator import Mp3QuranCoordinator
 from .session import PlaybackSessionManager
 
-# entity_id is provided by the service target picker; keep it in the schema so
-# both UI target selection and YAML entity_id still validate.
+# ALLOW_EXTRA so HA target fields (device_id / area_id) are not rejected by voluptuous.
 PLAY_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
+        vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
         vol.Required(ATTR_RECITER_ID): vol.Coerce(int),
         vol.Optional(ATTR_MOSHAF_ID): vol.Coerce(int),
         vol.Optional(ATTR_SURAH, default=1): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=114)
         ),
-        vol.Optional(ATTR_AUTO_ADVANCE): cv.boolean,
+        vol.Optional(ATTR_AUTO_ADVANCE, default=DEFAULT_AUTO_ADVANCE): cv.boolean,
         vol.Optional(ATTR_SURAH_REPEAT): vol.All(
             vol.Coerce(int),
             vol.Range(min=MIN_SURAH_REPEAT, max=MAX_SURAH_REPEAT),
         ),
-    }
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 STOP_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
-    }
+        vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 
@@ -62,19 +65,38 @@ def async_register_services(
     """Register domain services once."""
 
     async def _entity_ids(call: ServiceCall) -> list[str]:
-        """Resolve target/entity_id from the service call."""
+        """Resolve media_player targets from entity/device/area selection."""
+        extracted: set[str] = set()
+
+        # Newer HA: async_extract_entity_ids(service_call)
+        # Older HA: async_extract_entity_ids(hass, service_call)
         try:
-            extracted = await async_extract_entity_ids(hass, call)
-        except Exception:  # noqa: BLE001 - fall back for lightweight test stubs
+            extracted.update(await async_extract_entity_ids(call))
+        except TypeError:
+            try:
+                extracted.update(await async_extract_entity_ids(hass, call))
+            except Exception:  # noqa: BLE001
+                extracted = set()
+        except Exception:  # noqa: BLE001
             extracted = set()
-        if extracted:
-            return sorted(extracted)
+
         raw = call.data.get(ATTR_ENTITY_ID)
-        if not raw:
-            raise HomeAssistantError("No media player target selected")
-        if isinstance(raw, str):
-            return [raw]
-        return list(raw)
+        if raw:
+            extracted.update([raw] if isinstance(raw, str) else list(raw))
+
+        extracted.update(_media_players_from_registry(hass, call.data))
+
+        media_players = sorted(
+            entity_id
+            for entity_id in extracted
+            if isinstance(entity_id, str) and entity_id.startswith("media_player.")
+        )
+        if not media_players:
+            raise HomeAssistantError(
+                "No media_player target found. Select a media player entity "
+                "(or a device that includes one)."
+            )
+        return media_players
 
     async def async_handle_play(call: ServiceCall) -> None:
         """Start continuous playback on one or more media players."""
@@ -103,10 +125,7 @@ def async_register_services(
             )
 
         options = coordinator.entry.options
-        auto_advance = call.data.get(
-            ATTR_AUTO_ADVANCE,
-            options.get(CONF_AUTO_ADVANCE, DEFAULT_AUTO_ADVANCE),
-        )
+        auto_advance = call.data.get(ATTR_AUTO_ADVANCE, DEFAULT_AUTO_ADVANCE)
         surah_repeat = call.data.get(
             ATTR_SURAH_REPEAT,
             options.get(CONF_SURAH_REPEAT, DEFAULT_SURAH_REPEAT),
@@ -123,9 +142,9 @@ def async_register_services(
             )
 
     async def async_handle_stop(call: ServiceCall) -> None:
-        """Stop continuous playback sessions."""
+        """Stop continuous playback sessions and current audio."""
         for entity_id in await _entity_ids(call):
-            sessions.stop(entity_id)
+            await sessions.async_stop(entity_id, stop_media=True)
 
     if not hass.services.has_service(DOMAIN, SERVICE_PLAY):
         hass.services.async_register(
@@ -141,6 +160,53 @@ def async_register_services(
             async_handle_stop,
             schema=STOP_SCHEMA,
         )
+
+
+def _as_id_list(value: Any) -> list[str]:
+    """Normalize a target id field to a list of strings."""
+    if not value:
+        return []
+    if isinstance(value, str):
+        return [value]
+    return [item for item in value if isinstance(item, str)]
+
+
+def _media_players_from_registry(hass: HomeAssistant, data: dict[str, Any]) -> set[str]:
+    """Expand device_id / area_id targets to media_player entity ids."""
+    device_ids = _as_id_list(data.get("device_id"))
+    area_ids = _as_id_list(data.get("area_id"))
+    if not device_ids and not area_ids:
+        return set()
+
+    try:
+        registry = er.async_get(hass)
+    except Exception:  # noqa: BLE001 - tests without a registry
+        return set()
+
+    found: set[str] = set()
+    entities = registry.entities
+
+    def _add(entry: Any) -> None:
+        entity_id = getattr(entry, "entity_id", "")
+        if not entity_id.startswith("media_player."):
+            return
+        if getattr(entry, "disabled_by", None):
+            return
+        found.add(entity_id)
+
+    for device_id in device_ids:
+        getter = getattr(entities, "get_entries_for_device_id", None)
+        entries = getter(device_id) if getter else []
+        for entry in entries:
+            _add(entry)
+
+    for area_id in area_ids:
+        getter = getattr(entities, "get_entries_for_area_id", None)
+        entries = getter(area_id) if getter else []
+        for entry in entries:
+            _add(entry)
+
+    return found
 
 
 def async_unregister_services(hass: HomeAssistant) -> None:

@@ -64,12 +64,17 @@ def _catalog() -> Catalog:
 
 
 def _source(
-    catalog: Catalog, display_language: str = "english"
+    catalog: Catalog,
+    display_language: str = "english",
+    favorite_reciters: list[int] | None = None,
 ) -> Mp3QuranMediaSource:
     entry = MagicMock()
     entry.title = "MP3 Quran"
     entry.state = ConfigEntryState.LOADED
-    entry.options = {"display_language": display_language}
+    entry.options = {
+        "display_language": display_language,
+        "favorite_reciters": favorite_reciters or [],
+    }
     coordinator = MagicMock()
     coordinator.data = catalog
     entry.runtime_data = SimpleNamespace(coordinator=coordinator)
@@ -98,6 +103,16 @@ async def test_browse_root_sorted_english_with_ids() -> None:
     assert "[1]" in titles[0] or "[102]" in titles[0]
     assert all("[" in title for title in titles)
     assert all("ماهر" not in title for title in titles)
+
+
+@pytest.mark.asyncio
+async def test_browse_root_favorites_first() -> None:
+    source = _source(_catalog(), display_language="english", favorite_reciters=[102])
+    root = await source.async_browse_media(MediaSourceItem(None))
+    titles = [child.title for child in root.children]
+    assert titles[0].startswith("★ ")
+    assert "[102]" in titles[0]
+    assert not titles[1].startswith("★ ")
 
 
 @pytest.mark.asyncio
