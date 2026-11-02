@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.5
+
+- The dashboard card shows the current track position, duration, and a progress bar while the selected media player is playing or paused. Dragging that bar seeks when the player supports it.
+
 ## 1.4.4
 
 - The dashboard card is added to Settings, Dashboards, Resources when Home Assistant finishes starting, as `/mp3quran/mp3quran-card.js`.
