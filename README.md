@@ -92,7 +92,7 @@ Or press the matching **Stop MP3 Quran (...)** button entity created when a sess
 
 ![MP3 Quran card](docs/mp3quran-card.png)
 
-The integration registers a Lovelace card. After a restart, add **MP3 Quran** from the card picker, or paste:
+The integration registers a Lovelace card and adds it under **Settings → Dashboards → Resources**. You do not create that resource yourself. After a restart, add **MP3 Quran** from the card picker, or paste:
 
 ```yaml
 type: custom:mp3quran-card
@@ -143,6 +143,10 @@ actions:
 ```
 
 ## Changelog
+
+### 1.4.4
+
+- The dashboard card is added to **Settings → Dashboards → Resources** when Home Assistant finishes starting, as `/mp3quran/mp3quran-card.js`.
 
 ### 1.4.1
 

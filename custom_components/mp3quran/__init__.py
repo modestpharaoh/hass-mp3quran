@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import logging
 from pathlib import Path
 
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
+from homeassistant.core import CoreState, HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
@@ -37,19 +38,49 @@ class Mp3QuranRuntimeData:
 type Mp3QuranConfigEntry = ConfigEntry[Mp3QuranRuntimeData]
 
 
-_FRONTEND_READY = "frontend_ready"
+_STATIC_READY = "static_ready"
+_CARD_RESOURCE_READY = "card_resource_ready"
+
+
+def _card_url() -> str:
+    """Return the card URL, including the integration version for cache busting."""
+    root = Path(__file__).parent
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    return f"{CARD_URL}?v={manifest['version']}"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up from YAML (config entry only) and register the Lovelace card."""
-    await _async_register_frontend(hass)
+    await _async_register_static(hass)
+    _schedule_card_resource(hass)
     return True
 
 
-async def _async_register_frontend(hass: HomeAssistant) -> None:
-    """Serve the card once and load it in the frontend."""
+def _ha_has_started(hass: HomeAssistant) -> bool:
+    """Return True only after startup, not while Home Assistant is still starting.
+
+    hass.is_running is already true during startup, which is too early for the
+    Lovelace resource list.
+    """
+    return getattr(hass, "state", None) is CoreState.running
+
+
+def _schedule_card_resource(hass: HomeAssistant) -> None:
+    """Register the dashboard resource once Lovelace storage is available."""
+    if _ha_has_started(hass):
+        hass.async_create_task(_async_register_card(hass))
+        return
+
+    async def _on_started(_event) -> None:
+        await _async_register_card(hass)
+
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _on_started)
+
+
+async def _async_register_static(hass: HomeAssistant) -> None:
+    """Serve the card script and icon."""
     domain_data = hass.data.setdefault(DOMAIN, {})
-    if domain_data.get(_FRONTEND_READY):
+    if domain_data.get(_STATIC_READY):
         return
     root = Path(__file__).parent
     await hass.http.async_register_static_paths(
@@ -58,8 +89,54 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
             StaticPathConfig("/mp3quran_brand", str(root / "brand"), False),
         ]
     )
-    add_extra_js_url(hass, CARD_URL)
-    domain_data[_FRONTEND_READY] = True
+    domain_data[_STATIC_READY] = True
+
+
+async def _async_register_card(hass: HomeAssistant) -> None:
+    """Add the card to the dashboard resource list.
+
+    That is the same list HACS uses, shown under Settings, Dashboards,
+    Resources. Lovelace loads it with the dashboard. The extra-js fallback is
+    only for YAML mode, where that list is read-only.
+    """
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    if domain_data.get(_CARD_RESOURCE_READY):
+        return
+
+    card_url = _card_url()
+    lovelace = hass.data.get("lovelace")
+    resources = getattr(lovelace, "resources", None)
+    if getattr(lovelace, "resource_mode", None) != "storage" or resources is None:
+        _LOGGER.warning(
+            "MP3 Quran card was not added to dashboard resources because "
+            "Lovelace storage resources are not available yet"
+        )
+        add_extra_js_url(hass, card_url)
+        domain_data[_CARD_RESOURCE_READY] = True
+        return
+
+    try:
+        if not getattr(resources, "loaded", True):
+            await resources.async_get_info()
+        for item in resources.async_items():
+            url = str(item.get("url", ""))
+            if url.split("?", 1)[0] != CARD_URL:
+                continue
+            if url != card_url:
+                await resources.async_update_item(
+                    item["id"], {"res_type": "module", "url": card_url}
+                )
+                _LOGGER.info("Updated MP3 Quran dashboard resource %s", card_url)
+            domain_data[_CARD_RESOURCE_READY] = True
+            return
+        await resources.async_create_item({"res_type": "module", "url": card_url})
+        _LOGGER.info("Registered MP3 Quran dashboard resource %s", card_url)
+        domain_data[_CARD_RESOURCE_READY] = True
+    except Exception:
+        _LOGGER.exception(
+            "Could not register the MP3 Quran card as a dashboard resource"
+        )
+        add_extra_js_url(hass, card_url)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: Mp3QuranConfigEntry) -> bool:
@@ -74,6 +151,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: Mp3QuranConfigEntry) -> 
     )
 
     async_register_services(hass, coordinator, sessions)
+    if _ha_has_started(hass):
+        await _async_register_card(hass)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
