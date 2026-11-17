@@ -3,68 +3,39 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# C extensions
-*.so
-
 # Distribution / packaging
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+.eggs/
+*.tar.gz
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
+# Unit test / coverage
+.pytest_cache/
 .coverage
 .coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-pytestdebug.log
-
-# Translations
-*.mo
-*.pot
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# mypy
+htmlcov/
+.cache/
 .mypy_cache/
-.dmypy.json
-dmypy.json
 
-# Home Assistant
+# Environments and secrets
+.env
+.env.*
+.venv/
+venv/
+
+# Home Assistant local runtime
 .storage
 .cloud
-custom_components/*/__pycache__/
 
 # OS / editor
 .DS_Store
 .idea/
 .vscode/
 *.swp
+
+# Agent-local overrides. The shared guides stay tracked.
+**/.claude/settings.local.json
+CLAUDE.local.md
+AGENTS.override.md
+.gemini/
