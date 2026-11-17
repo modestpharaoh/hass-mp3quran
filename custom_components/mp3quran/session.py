@@ -31,6 +31,8 @@ from .const import (
     DEFAULT_AUTO_ADVANCE,
     DEFAULT_SURAH_REPEAT,
     END_OF_TRACK_RATIO,
+    MAX_SURAH_REPEAT,
+    MIN_SURAH_REPEAT,
     END_OF_TRACK_SLACK_SECONDS,
     MIME_TYPE_MP3,
     get_display_language,
@@ -249,6 +251,28 @@ class PlaybackSessionManager:
                 self.stop(entity_id)
                 raise
         return session
+
+    async def async_update(
+        self,
+        entity_id: str,
+        *,
+        auto_advance: bool | None = None,
+        loop: bool | None = None,
+        surah_repeat: int | None = None,
+    ) -> None:
+        """Change loop, auto-advance, or repeat on a session without restarting audio."""
+        session = self._sessions.get(entity_id)
+        if session is None or not session.active:
+            raise ValueError("No active MP3 Quran session on this media player")
+        if auto_advance is not None:
+            session.auto_advance = bool(auto_advance)
+        if loop is not None:
+            session.loop = bool(loop)
+        if surah_repeat is not None:
+            count = max(MIN_SURAH_REPEAT, min(MAX_SURAH_REPEAT, int(surah_repeat)))
+            session.surah_repeat = count
+            session.plays_remaining = count
+        self._notify_listeners()
 
     async def async_stop(
         self, entity_id: str, *, stop_media: bool = True

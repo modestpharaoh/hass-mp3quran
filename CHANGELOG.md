@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.7
+
+- The dashboard card follows the integration display language, including right-to-left layout in Arabic.
+- Reciter, moshaf, and surah selectors follow the active session, and return to the card’s saved values when that session ends.
+- Changing loop, auto-advance, or the repeat count updates the current session through `mp3quran.update_session` without restarting playback.
+
 ## 1.4.6
 
 - The dashboard card can pause and resume players that support it. Those controls sit in the track panel with previous and next surah. Resume keeps auto-advance available when the surah ends.

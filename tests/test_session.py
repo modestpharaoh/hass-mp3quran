@@ -449,3 +449,42 @@ def test_natural_end_helpers() -> None:
         )
         is False
     )
+
+
+@pytest.mark.asyncio
+async def test_update_session_changes_settings_without_replaying(hass) -> None:
+    manager, reciter, moshaf = _manager(hass)
+    entity_id = "media_player.living_room"
+    session = await manager.async_start(
+        entity_id,
+        reciter,
+        moshaf,
+        2,
+        auto_advance=False,
+        loop=False,
+        surah_repeat=2,
+        play=False,
+    )
+    session.plays_remaining = 1
+    hass.services.async_call.reset_mock()
+
+    await manager.async_update(
+        entity_id,
+        auto_advance=True,
+        loop=True,
+        surah_repeat=5,
+    )
+
+    assert session.surah == 2
+    assert session.auto_advance is True
+    assert session.loop is True
+    assert session.surah_repeat == 5
+    assert session.plays_remaining == 5
+    hass.services.async_call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_session_requires_an_active_session(hass) -> None:
+    manager, _, _ = _manager(hass)
+    with pytest.raises(ValueError, match="No active"):
+        await manager.async_update("media_player.living_room", loop=True)

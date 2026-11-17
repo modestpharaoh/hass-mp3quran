@@ -31,6 +31,7 @@ from .const import (
     SERVICE_PLAY,
     SERVICE_PREVIOUS_SURAH,
     SERVICE_STOP,
+    SERVICE_UPDATE_SESSION,
 )
 from .coordinator import Mp3QuranCoordinator
 from .session import PlaybackSessionManager
@@ -57,6 +58,19 @@ PLAY_SCHEMA = vol.Schema(
 STOP_SCHEMA = vol.Schema(
     {
         vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
+    },
+    extra=vol.ALLOW_EXTRA,
+)
+
+UPDATE_SESSION_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
+        vol.Optional(ATTR_AUTO_ADVANCE): cv.boolean,
+        vol.Optional(ATTR_LOOP): cv.boolean,
+        vol.Optional(ATTR_SURAH_REPEAT): vol.All(
+            vol.Coerce(int),
+            vol.Range(min=MIN_SURAH_REPEAT, max=MAX_SURAH_REPEAT),
+        ),
     },
     extra=vol.ALLOW_EXTRA,
 )
@@ -169,6 +183,22 @@ def async_register_services(
         """Play the previous surah in the active session."""
         await _handle_skip(call, -1)
 
+    async def async_handle_update(call: ServiceCall) -> None:
+        """Apply loop, auto-advance, or repeat to each active session."""
+        auto_advance = call.data[ATTR_AUTO_ADVANCE] if ATTR_AUTO_ADVANCE in call.data else None
+        loop = call.data[ATTR_LOOP] if ATTR_LOOP in call.data else None
+        surah_repeat = call.data[ATTR_SURAH_REPEAT] if ATTR_SURAH_REPEAT in call.data else None
+        for entity_id in await _entity_ids(call):
+            try:
+                await sessions.async_update(
+                    entity_id,
+                    auto_advance=auto_advance,
+                    loop=loop,
+                    surah_repeat=surah_repeat,
+                )
+            except ValueError as err:
+                raise HomeAssistantError(str(err)) from err
+
     if not hass.services.has_service(DOMAIN, SERVICE_PLAY):
         hass.services.async_register(
             DOMAIN,
@@ -196,6 +226,13 @@ def async_register_services(
             SERVICE_PREVIOUS_SURAH,
             async_handle_previous,
             schema=STOP_SCHEMA,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_SESSION):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_UPDATE_SESSION,
+            async_handle_update,
+            schema=UPDATE_SESSION_SCHEMA,
         )
 
 
@@ -253,6 +290,7 @@ def async_unregister_services(hass: HomeAssistant) -> None:
         SERVICE_STOP,
         SERVICE_NEXT_SURAH,
         SERVICE_PREVIOUS_SURAH,
+        SERVICE_UPDATE_SESSION,
     ):
         if hass.services.has_service(DOMAIN, service):
             hass.services.async_remove(DOMAIN, service)
