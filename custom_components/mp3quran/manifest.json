@@ -4,6 +4,9 @@
   "after_dependencies": [
     "lovelace"
   ],
+  "categories": [
+    "media_entertainment.music_radio_services"
+  ],
   "codeowners": [
     "@modestpharaoh"
   ],

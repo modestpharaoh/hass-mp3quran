@@ -65,6 +65,9 @@ def _ensure_ha_stubs() -> None:
             self.http = MagicMock()
             self.http.async_register_static_paths = AsyncMock()
 
+        async def async_add_executor_job(self, target, *args):
+            return target(*args)
+
     def callback(func):
         return func
 
