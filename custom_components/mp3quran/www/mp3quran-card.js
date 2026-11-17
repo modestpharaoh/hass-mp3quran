@@ -13,8 +13,9 @@ const STRINGS = {
     player: "Media player",
     reciter: "Reciter",
     moshaf: "Moshaf",
-    surah: "Starting surah",
+    surah: "Surah",
     repeat: "Surah repeat",
+    settings: "Playback settings",
     advance: "Advance to next surah",
     loop: "Loop back to the first surah",
     play: "Play",
@@ -43,8 +44,9 @@ const STRINGS = {
     player: "مشغل الوسائط",
     reciter: "القارئ",
     moshaf: "المصحف",
-    surah: "سورة البداية",
+    surah: "السورة",
     repeat: "تكرار السورة",
+    settings: "إعدادات التشغيل",
     advance: "الانتقال إلى السورة التالية",
     loop: "العودة إلى السورة الأولى",
     play: "تشغيل",
@@ -77,8 +79,26 @@ function language(hass) {
   return String(code).toLowerCase().startsWith("ar") ? "ar" : "en";
 }
 
+function integrationLanguage(hass) {
+  if (!hass || !hass.states) return language(hass);
+  const known = [
+    "sensor.mp3quran_active_sessions",
+    "sensor.mp3_quran_active_sessions",
+  ];
+  const states = known
+    .map((id) => hass.states[id])
+    .filter(Boolean)
+    .concat(Object.values(hass.states));
+  for (const state of states) {
+    if (!state || !state.entity_id || !state.entity_id.startsWith("sensor.")) continue;
+    const value = state.attributes && state.attributes.display_language;
+    if (value === "arabic" || value === "english") return value === "arabic" ? "ar" : "en";
+  }
+  return language(hass);
+}
+
 function strings(hass) {
-  return STRINGS[language(hass)];
+  return STRINGS[integrationLanguage(hass)];
 }
 
 function idFromContent(contentId, key) {
@@ -106,6 +126,27 @@ function errorText(err, fallback) {
   if (!err) return fallback;
   if (typeof err === "string") return err;
   return err.message || fallback;
+}
+
+function playbackChoice(session, config) {
+  if (
+    session &&
+    session.reciter_id != null &&
+    session.reciter_id !== "" &&
+    session.surah != null &&
+    session.surah !== ""
+  ) {
+    return {
+      reciter: numberOrNull(session.reciter_id),
+      moshaf: numberOrNull(session.moshaf_id),
+      surah: numberOrNull(session.surah),
+    };
+  }
+  return {
+    reciter: numberOrNull(config && config.reciter_id),
+    moshaf: numberOrNull(config && config.moshaf_id),
+    surah: numberOrNull(config && config.surah),
+  };
 }
 
 function sessionFor(hass, entityId) {
@@ -204,6 +245,7 @@ function fillSelect(select, options, selected, placeholder) {
 
 const STYLE = `
   :host { display: block; }
+  [hidden] { display: none !important; }
   ha-card { overflow: hidden; }
   .header {
     display: flex;
@@ -307,30 +349,60 @@ const STYLE = `
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 16px;
+    gap: 8px;
     margin-top: 14px;
   }
   .transport button {
-    flex: 0 0 44px;
-    width: 44px;
-    height: 44px;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
     padding: 0;
+    border: none;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.16);
     color: #f4fbff;
+    cursor: pointer;
+    transition: background 80ms ease, color 80ms ease, box-shadow 80ms ease, transform 80ms ease;
   }
   .transport button.pause {
-    flex-basis: 52px;
-    width: 52px;
-    height: 52px;
+    flex-basis: 48px;
+    width: 48px;
+    height: 48px;
     background: #f4fbff;
     color: #0c2a34;
   }
-  .transport button[hidden] { display: none; }
-  ha-icon { --mdc-icon-size: 20px; }
+  .transport button:hover {
+    background: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.28);
+    transform: scale(1.08);
+  }
+  .transport button.pause:hover {
+    background: #ffffff;
+    box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.38);
+    transform: scale(1.08);
+  }
+  .transport button:active,
+  .transport button.pressed {
+    background: #ffffff;
+    color: #0c2a34;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.45);
+    transform: scale(0.9);
+  }
+  .transport button.pause:active,
+  .transport button.pause.pressed {
+    background: #1287b8;
+    color: #ffffff;
+    box-shadow: 0 0 0 5px rgba(18, 135, 184, 0.45);
+    transform: scale(0.9);
+  }
+  .transport button:focus-visible { outline: 2px solid #ffffff; outline-offset: 3px; }
+  .transport button:disabled { opacity: 0.45; cursor: default; transform: none; box-shadow: none; }
+  ha-icon { --mdc-icon-size: 22px; color: inherit; pointer-events: none; }
   .body { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 16px; }
   label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--secondary-text-color); }
   label.hidden, .hidden { display: none; }
+  label .name { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+  label .name ha-icon { --mdc-icon-size: 16px; }
   select, input[type="number"] {
     width: 100%;
     box-sizing: border-box;
@@ -341,6 +413,60 @@ const STYLE = `
     color: var(--primary-text-color);
     font: inherit;
   }
+  .settings-head {
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+    color: var(--secondary-text-color);
+  }
+  .toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    gap: 8px;
+  }
+  button.toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    flex: none;
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 14px;
+    text-align: start;
+    border: 1px solid rgba(18, 135, 184, 0.55);
+    background: rgba(0, 0, 0, 0.18);
+    color: var(--primary-text-color);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button.toggle .name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  button.toggle .label { min-width: 0; }
+  button.toggle ha-icon { --mdc-icon-size: 18px; flex: 0 0 auto; }
+  button.toggle .switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 20px;
+    margin-inline-start: auto;
+    border-radius: 999px;
+    background: #3a3f3c;
+  }
+  button.toggle .thumb {
+    position: absolute;
+    inset-inline-start: 2px;
+    top: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #c5c9c6;
+    transition: inset-inline-start 140ms ease, background 140ms ease;
+  }
+  button.toggle.on .switch { background: #1287b8; }
+  button.toggle.on .thumb { inset-inline-start: 18px; background: #ffffff; }
+  button.toggle:focus-visible { outline: 2px solid #1287b8; outline-offset: 3px; }
   .volume {
     display: flex;
     align-items: center;
@@ -352,21 +478,14 @@ const STYLE = `
     padding: 0;
     border: none;
     border-radius: 999px;
-    accent-color: #1aa3d6;
+    accent-color: #1287b8;
     cursor: pointer;
   }
   .pct {
-    min-width: 2.6em;
+    min-width: 3em;
     text-align: end;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-variant-numeric: tabular-nums;
-    color: var(--primary-text-color);
-  }
-  .switch {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 14px;
     color: var(--primary-text-color);
   }
   .actions { display: flex; gap: 8px; }
@@ -382,6 +501,9 @@ const STYLE = `
     font: inherit;
     cursor: pointer;
   }
+  button.action {
+    transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+  }
   button.icon {
     flex: 0 0 36px;
     width: 36px;
@@ -390,16 +512,40 @@ const STYLE = `
     border-radius: 50%;
     background: var(--secondary-background-color, rgba(127, 127, 127, 0.18));
     color: var(--primary-text-color);
+    transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+  }
+  button.icon:hover { background: var(--divider-color, rgba(127, 127, 127, 0.4)); transform: scale(1.06); }
+  button.icon:active,
+  button.icon.pressed {
+    background: var(--primary-text-color);
+    color: var(--card-background-color, #fff);
+    transform: scale(0.9);
   }
   button.play { background: #1287b8; color: #fff; }
+  button.play:hover { background: #1aa3d6; box-shadow: 0 0 0 3px rgba(18, 135, 184, 0.28); }
+  button.play:active,
+  button.play.pressed {
+    background: #ffffff;
+    color: #1287b8;
+    box-shadow: inset 0 0 0 2px #1287b8;
+    transform: scale(0.97);
+  }
   button.stop {
     background: var(--secondary-background-color, rgba(127, 127, 127, 0.2));
     color: var(--primary-text-color);
   }
+  button.stop:hover { box-shadow: inset 0 0 0 2px var(--primary-text-color); }
+  button.stop:active,
+  button.stop.pressed {
+    background: var(--primary-text-color, #1c1c1c);
+    color: var(--card-background-color, #fff);
+    transform: scale(0.97);
+  }
+  button.action:focus-visible { outline: 2px solid #1287b8; outline-offset: 3px; }
   button:disabled { opacity: 0.5; cursor: default; }
-  .status { color: var(--secondary-text-color); font-size: 0.9em; }
+  .status { min-height: 1.2em; color: var(--secondary-text-color); font-size: 0.9em; }
+  .status:empty { display: none; }
   .status.error { color: var(--error-color, #db4437); }
-  .status[hidden] { display: none; }
 `;
 
 function brandImage(className) {
@@ -416,14 +562,77 @@ function brandImage(className) {
   return image;
 }
 
+function showPress(button) {
+  button.addEventListener("pointerdown", () => {
+    button.classList.add("pressed");
+    window.setTimeout(() => button.classList.remove("pressed"), 320);
+  });
+}
+
+function haIcon(iconName) {
+  const icon = document.createElement("ha-icon");
+  icon.icon = iconName;
+  icon.setAttribute("icon", iconName);
+  return icon;
+}
+
+function setIcon(button, iconName) {
+  const icon = button && button.querySelector("ha-icon");
+  if (!icon) return;
+  icon.icon = iconName;
+  icon.setAttribute("icon", iconName);
+}
+
 function iconButton(className, iconName) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = className;
-  const icon = document.createElement("ha-icon");
-  icon.icon = iconName;
-  icon.setAttribute("icon", iconName);
-  button.append(icon);
+  button.append(haIcon(iconName));
+  showPress(button);
+  return button;
+}
+
+function chipButton(className, iconName) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `toggle ${className}`;
+  const name = document.createElement("span");
+  name.className = "name";
+  const text = document.createElement("span");
+  text.className = "label";
+  name.append(haIcon(iconName), text);
+  const track = document.createElement("span");
+  track.className = "switch";
+  track.setAttribute("aria-hidden", "true");
+  const thumb = document.createElement("span");
+  thumb.className = "thumb";
+  track.append(thumb);
+  button.append(name, track);
+  let on = false;
+  Object.defineProperty(button, "checked", {
+    get() {
+      return on;
+    },
+    set(value) {
+      on = Boolean(value);
+      button.classList.toggle("on", on);
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    },
+  });
+  button.checked = false;
+  button.addEventListener("click", () => {
+    button.checked = !button.checked;
+    button.dispatchEvent(new Event("change"));
+  });
+  return button;
+}
+
+function actionButton(className, iconName) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `action ${className}`;
+  button.append(haIcon(iconName), document.createElement("span"));
+  showPress(button);
   return button;
 }
 
@@ -514,56 +723,39 @@ function buildShell(chrome) {
     card.append(header, stage);
   }
 
-  const player = field("select");
-  const reciter = field("select");
-  const moshaf = field("select");
-  const surah = field("select");
-  const repeat = field("input");
+  const player = field("select", "mdi:speaker");
+  const reciter = field("select", "mdi:account-voice");
+  const moshaf = field("select", "mdi:book-open-page-variant");
+  const surah = field("select", "mdi:book-open-variant");
+  const repeat = field("input", "mdi:repeat-once");
   repeat.input.type = "number";
   repeat.input.min = "1";
   repeat.input.max = "20";
   repeat.input.step = "1";
-  const advance = document.createElement("label");
-  advance.className = "switch";
-  const advanceText = document.createElement("span");
-  const advanceInput = document.createElement("input");
-  advanceInput.type = "checkbox";
-  advance.append(advanceText, advanceInput);
-  const loop = document.createElement("label");
-  loop.className = "switch";
-  const loopText = document.createElement("span");
-  const loopInput = document.createElement("input");
-  loopInput.type = "checkbox";
-  loop.append(loopText, loopInput);
+  const settingsHead = document.createElement("div");
+  settingsHead.className = "settings-head";
+  const advance = chipButton("advance", "mdi:skip-next");
+  const loop = chipButton("loop", "mdi:repeat");
+  const settings = document.createElement("div");
+  settings.className = "toggle-grid";
+  settings.append(advance, loop);
 
   const actions = document.createElement("div");
   actions.className = "actions";
-  const play = document.createElement("button");
-  play.type = "button";
-  play.className = "play";
-  const playIcon = document.createElement("ha-icon");
-  playIcon.icon = "mdi:play";
-  playIcon.setAttribute("icon", "mdi:play");
-  const playLabel = document.createElement("span");
-  play.append(playIcon, playLabel);
-  const stop = document.createElement("button");
-  stop.type = "button";
-  stop.className = "stop";
-  const stopIcon = document.createElement("ha-icon");
-  stopIcon.icon = "mdi:stop";
-  stopIcon.setAttribute("icon", "mdi:stop");
-  const stopLabel = document.createElement("span");
-  stop.append(stopIcon, stopLabel);
-  actions.append(play, stop);
+  const stop = actionButton("stop", "mdi:stop");
+  const play = actionButton("play", "mdi:play");
+  const playLabel = play.querySelector("span");
+  const stopLabel = stop.querySelector("span");
+  actions.append(stop, play);
 
   const status = document.createElement("div");
   status.className = "status";
   status.setAttribute("role", "status");
   status.hidden = true;
 
-  const rows = [player.label];
+  const rows = [settingsHead, settings, actions, player.label];
   if (volume) rows.push(volume.row);
-  rows.push(reciter.label, moshaf.label, surah.label, repeat.label, advance, loop, actions, status);
+  rows.push(status, reciter.label, moshaf.label, surah.label, repeat.label);
   body.append(...rows);
   card.append(body);
   return {
@@ -580,17 +772,14 @@ function buildShell(chrome) {
     pauseIcon,
     next,
     volume,
+    settingsHead,
     player,
     reciter,
     moshaf,
     surah,
     repeat,
     advance,
-    advanceText,
-    advanceInput,
     loop,
-    loopText,
-    loopInput,
     actions,
     play,
     playLabel,
@@ -600,11 +789,15 @@ function buildShell(chrome) {
   };
 }
 
-function field(kind) {
+function field(kind, iconName) {
   const label = document.createElement("label");
+  const name = document.createElement("span");
+  name.className = "name";
   const text = document.createElement("span");
+  if (iconName) name.append(haIcon(iconName), text);
+  else name.append(text);
   const input = document.createElement(kind);
-  label.append(text, input);
+  label.append(name, input);
   return { label, text, input };
 }
 
@@ -634,6 +827,10 @@ class Mp3QuranCard extends HTMLElement {
     this._progressTimer = null;
     this._seekHold = false;
     this._seekPreview = null;
+    this._followedPlayback = false;
+    this._followBusy = false;
+    this._settingsPush = null;
+    this._catalogLanguage = null;
   }
 
   disconnectedCallback() {
@@ -682,12 +879,26 @@ class Mp3QuranCard extends HTMLElement {
       this._bind();
       this._ready = true;
     }
+    const lang = integrationLanguage(this._hass);
+    if (this._catalogLanguage !== lang) {
+      const changed = this._catalogLanguage != null;
+      this._catalogLanguage = lang;
+      if (changed) {
+        this._reciters = [];
+        this._moshafs = [];
+        this._surahs = [];
+        this._token += 1;
+      }
+    }
     this._applyStrings();
+    this._syncSettingsFromSession();
     this._paintPlayers();
     this._paintSelections();
     this._paintStatus();
     if (this._hass.callWS && !this._reciters.length && !this._loading) {
       this._loadReciters();
+    } else {
+      this._syncSelectors();
     }
   }
 
@@ -719,12 +930,16 @@ class Mp3QuranCard extends HTMLElement {
     ui.repeat.input.addEventListener("change", () => {
       this._repeat = clampRepeat(ui.repeat.input.value);
       ui.repeat.input.value = String(this._repeat);
+      this._pushSessionSettings();
     });
-    ui.advanceInput.addEventListener("change", () => {
-      this._autoAdvance = ui.advanceInput.checked;
+    ui.advance.addEventListener("change", () => {
+      this._autoAdvance = ui.advance.checked;
+      this._pushSessionSettings();
+      this._paintTransport();
     });
-    ui.loopInput.addEventListener("change", () => {
-      this._loop = ui.loopInput.checked;
+    ui.loop.addEventListener("change", () => {
+      this._loop = ui.loop.checked;
+      this._pushSessionSettings();
       this._paintTransport();
     });
     ui.play.addEventListener("click", () => this._play());
@@ -764,19 +979,23 @@ class Mp3QuranCard extends HTMLElement {
   _applyStrings() {
     const text = strings(this._hass);
     const ui = this._ui;
+    const rtl = text.dir === "rtl";
     ui.card.dir = text.dir;
     ui.title.textContent = text.title;
+    ui.settingsHead.textContent = text.settings;
     ui.volume.down.setAttribute("aria-label", text.volumeDown);
     ui.volume.up.setAttribute("aria-label", text.volumeUp);
     ui.previous.setAttribute("aria-label", text.previous);
     ui.next.setAttribute("aria-label", text.next);
+    setIcon(ui.previous, rtl ? "mdi:skip-next" : "mdi:skip-previous");
+    setIcon(ui.next, rtl ? "mdi:skip-previous" : "mdi:skip-next");
     ui.player.text.textContent = text.player;
     ui.reciter.text.textContent = text.reciter;
     ui.moshaf.text.textContent = text.moshaf;
     ui.surah.text.textContent = text.surah;
     ui.repeat.text.textContent = text.repeat;
-    ui.advanceText.textContent = text.advance;
-    ui.loopText.textContent = text.loop;
+    ui.advance.querySelector(".label").textContent = text.advance;
+    ui.loop.querySelector(".label").textContent = text.loop;
     ui.playLabel.textContent = text.play;
     ui.stopLabel.textContent = text.stop;
   }
@@ -802,8 +1021,8 @@ class Mp3QuranCard extends HTMLElement {
     if (this.shadowRoot.activeElement !== ui.repeat.input) {
       ui.repeat.input.value = String(this._repeat);
     }
-    ui.advanceInput.checked = this._autoAdvance;
-    ui.loopInput.checked = this._loop;
+    ui.advance.checked = this._autoAdvance;
+    ui.loop.checked = this._loop;
     const canPlay = Boolean(this._entity && this._reciterId && this._surah) && !this._loading;
     ui.play.disabled = !canPlay;
     ui.stop.disabled = !this._entity;
@@ -960,22 +1179,128 @@ class Mp3QuranCard extends HTMLElement {
   _nowPlaying() {
     const text = strings(this._hass);
     const session = sessionFor(this._hass, this._entity);
-    if (session && (session.title || session.artist)) {
-      return {
-        surah: session.title || text.surahEmpty,
-        reciter: session.artist || text.reciterEmpty,
-      };
-    }
-    const surah = this._surahs.find((item) => item.id === this._surah);
-    const reciter = this._reciters.find((item) => item.id === this._reciterId);
-    const moshaf = this._moshafs.find((item) => item.id === this._moshafId);
-    const reciterLabel = [reciter && reciter.label, this._showMoshaf && moshaf && moshaf.label]
-      .filter(Boolean)
-      .join(" · ");
+    const surahId = session ? numberOrNull(session.surah) : this._surah;
+    const reciterId = session ? numberOrNull(session.reciter_id) : this._reciterId;
+    const moshafId = session ? numberOrNull(session.moshaf_id) : this._moshafId;
+    const surah = this._surahs.find((item) => item.id === surahId);
+    const reciter = this._reciters.find((item) => item.id === reciterId);
+    const moshaf = this._moshafs.find((item) => item.id === moshafId);
+    const reciterLabel = [reciter && reciter.label, moshaf && moshaf.label].filter(Boolean).join(" · ");
     return {
-      surah: (surah && surah.label) || text.surahEmpty,
-      reciter: reciterLabel || text.reciterEmpty,
+      surah: (surah && surah.label) || (session && session.title) || text.surahEmpty,
+      reciter: reciterLabel || (session && session.artist) || text.reciterEmpty,
     };
+  }
+
+  _syncSettingsFromSession() {
+    const session = sessionFor(this._hass, this._entity);
+    if (!session) return;
+    const pending = this._settingsPush;
+    const repeatFocused = this.shadowRoot.activeElement === this._ui.repeat.input;
+    if (!repeatFocused && session.surah_repeat != null) {
+      const next = clampRepeat(session.surah_repeat);
+      if (!pending || pending.surah_repeat == null || next === pending.surah_repeat) {
+        this._repeat = next;
+      }
+    }
+    if (typeof session.auto_advance === "boolean") {
+      if (!pending || pending.auto_advance == null || session.auto_advance === pending.auto_advance) {
+        this._autoAdvance = session.auto_advance;
+      }
+    }
+    if (typeof session.loop === "boolean") {
+      if (!pending || pending.loop == null || session.loop === pending.loop) {
+        this._loop = session.loop;
+      }
+    }
+    if (
+      pending &&
+      session.auto_advance === pending.auto_advance &&
+      session.loop === pending.loop &&
+      clampRepeat(session.surah_repeat) === pending.surah_repeat
+    ) {
+      this._settingsPush = null;
+    }
+  }
+
+  _pushSessionSettings() {
+    const session = sessionFor(this._hass, this._entity);
+    if (!this._entity || !session) return;
+    const patch = {
+      auto_advance: this._autoAdvance,
+      loop: this._loop,
+      surah_repeat: this._repeat,
+    };
+    this._settingsPush = patch;
+    const pending = this._hass.callService("mp3quran", "update_session", patch, { entity_id: this._entity });
+    if (pending && pending.catch) {
+      pending.catch((err) => {
+        this._settingsPush = null;
+        this._error = errorText(err, strings(this._hass).error);
+        this._paintStatus();
+      });
+    }
+  }
+
+  _samePlayback(choice) {
+    if (this._reciterId !== choice.reciter || this._surah !== choice.surah) return false;
+    if (!this._showMoshaf) return true;
+    return this._moshafId === choice.moshaf;
+  }
+
+  _syncSelectors() {
+    if (this._followBusy || !this._ui || !this._reciters.length) return;
+    const focused = this.shadowRoot.activeElement;
+    const ui = this._ui;
+    if (
+      focused === ui.reciter.input ||
+      focused === ui.moshaf.input ||
+      focused === ui.surah.input
+    ) {
+      return;
+    }
+    const session = sessionFor(this._hass, this._entity);
+    if (!session && !this._followedPlayback) return;
+    const choice = playbackChoice(session, this._config);
+    if (this._samePlayback(choice)) {
+      this._followedPlayback = Boolean(session);
+      return;
+    }
+    this._applySelectorChoice(choice, Boolean(session));
+  }
+
+  async _applySelectorChoice(choice, following) {
+    this._followBusy = true;
+    const token = ++this._token;
+    try {
+      const reciterChanged = this._reciterId !== choice.reciter;
+      const moshafChanged = this._moshafId !== choice.moshaf;
+      this._reciterId = choice.reciter;
+      this._moshafId = choice.moshaf;
+      this._surah = choice.surah;
+      this._followedPlayback = following;
+      if (choice.reciter == null) {
+        this._moshafs = [];
+        this._surahs = [];
+        this._showMoshaf = false;
+        this._paintSelections();
+        this._paintStatus();
+        return;
+      }
+      if (reciterChanged || !this._surahs.length) {
+        await this._loadReciter(choice.reciter, token);
+      } else if (moshafChanged && choice.moshaf != null && this._showMoshaf) {
+        await this._loadMoshaf(choice.reciter, choice.moshaf, token);
+      } else {
+        this._paintSelections();
+        this._paintStatus();
+      }
+    } catch (err) {
+      this._error = errorText(err, strings(this._hass).error);
+      this._paintStatus();
+    } finally {
+      if (token === this._token) this._followBusy = false;
+    }
   }
 
   _paintVolume() {
@@ -1070,6 +1395,7 @@ class Mp3QuranCard extends HTMLElement {
         this._loading = false;
         this._paintSelections();
         this._paintStatus();
+        this._syncSelectors();
       }
     }
   }
@@ -1144,19 +1470,19 @@ class Mp3QuranCard extends HTMLElement {
 
   _keepSurah() {
     if (!this._surahs.length) {
-      this._surah = null;
+      if (!this._followedPlayback) this._surah = null;
       return;
     }
-    if (!this._surahs.some((item) => item.id === this._surah)) {
-      this._surah = this._surahs[0].id;
-    }
+    if (this._surahs.some((item) => item.id === this._surah)) return;
+    if (this._followedPlayback) return;
+    this._surah = this._surahs[0].id;
   }
 
   async _play() {
     const text = strings(this._hass);
     this._repeat = clampRepeat(this._ui.repeat.input.value);
-    this._autoAdvance = this._ui.advanceInput.checked;
-    this._loop = this._ui.loopInput.checked;
+    this._autoAdvance = this._ui.advance.checked;
+    this._loop = this._ui.loop.checked;
     if (!this._entity || this._reciterId == null || this._surah == null) {
       this._error = text.missing;
       this._paintStatus();
@@ -1253,6 +1579,7 @@ class Mp3QuranCardEditor extends HTMLElement {
     this._showMoshaf = false;
     this._token = 0;
     this._loading = false;
+    this._catalogLanguage = null;
   }
 
   setConfig(config) {
@@ -1273,6 +1600,17 @@ class Mp3QuranCardEditor extends HTMLElement {
       this.shadowRoot.replaceChildren(this._ui.style, this._ui.card);
       this._bind();
     }
+    const lang = integrationLanguage(this._hass);
+    if (this._catalogLanguage !== lang) {
+      const changed = this._catalogLanguage != null;
+      this._catalogLanguage = lang;
+      if (changed) {
+        this._reciters = [];
+        this._moshafs = [];
+        this._surahs = [];
+        this._token += 1;
+      }
+    }
     this._applyStrings();
     this._paint();
     if (this._hass.callWS && !this._reciters.length && !this._loading) {
@@ -1286,13 +1624,14 @@ class Mp3QuranCardEditor extends HTMLElement {
     const ui = this._ui;
     ui.card.header = text.title;
     ui.card.dir = text.dir;
+    ui.settingsHead.textContent = text.settings;
     ui.player.text.textContent = text.player;
     ui.reciter.text.textContent = text.reciter;
     ui.moshaf.text.textContent = text.moshaf;
     ui.surah.text.textContent = text.surah;
     ui.repeat.text.textContent = text.repeat;
-    ui.advanceText.textContent = text.advance;
-    ui.loopText.textContent = text.loop;
+    ui.advance.querySelector(".label").textContent = text.advance;
+    ui.loop.querySelector(".label").textContent = text.loop;
     ui.playLabel.textContent = text.play;
     ui.stopLabel.textContent = text.stop;
   }
@@ -1310,8 +1649,8 @@ class Mp3QuranCardEditor extends HTMLElement {
         clampRepeat(this._config.surah_repeat == null ? 1 : this._config.surah_repeat)
       );
     }
-    ui.advanceInput.checked = Boolean(this._config.auto_advance);
-    ui.loopInput.checked = Boolean(this._config.loop);
+    ui.advance.checked = Boolean(this._config.auto_advance);
+    ui.loop.checked = Boolean(this._config.loop);
   }
 
   _bind() {
@@ -1343,11 +1682,11 @@ class Mp3QuranCardEditor extends HTMLElement {
     ui.repeat.input.addEventListener("change", () => {
       this._commit({ surah_repeat: clampRepeat(ui.repeat.input.value) });
     });
-    ui.advanceInput.addEventListener("change", () => {
-      this._commit({ auto_advance: ui.advanceInput.checked });
+    ui.advance.addEventListener("change", () => {
+      this._commit({ auto_advance: ui.advance.checked });
     });
-    ui.loopInput.addEventListener("change", () => {
-      this._commit({ loop: ui.loopInput.checked });
+    ui.loop.addEventListener("change", () => {
+      this._commit({ loop: ui.loop.checked });
     });
   }
 

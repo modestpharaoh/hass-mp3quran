@@ -75,3 +75,32 @@ previous_surah:
   target:
     entity:
       domain: media_player
+
+update_session:
+  name: Update session
+  description: Change auto-advance, loop, or the repeat count on an active session. Playback is not restarted.
+  target:
+    entity:
+      domain: media_player
+  fields:
+    auto_advance:
+      name: Auto-advance
+      description: Play the next surah when the current one finishes.
+      required: false
+      selector:
+        boolean:
+    loop:
+      name: Loop
+      description: After the last surah, continue from the first surah.
+      required: false
+      selector:
+        boolean:
+    surah_repeat:
+      name: Surah repeat
+      description: How many times to play the current surah and each later surah (1-20).
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 20
+          mode: box

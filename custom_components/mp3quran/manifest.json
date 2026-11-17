@@ -4,6 +4,9 @@
   "after_dependencies": [
     "lovelace"
   ],
+  "categories": [
+    "media_entertainment.music_radio_services"
+  ],
   "codeowners": [
     "@modestpharaoh"
   ],
@@ -20,5 +23,5 @@
     "custom_components.mp3quran"
   ],
   "requirements": [],
-  "version": "1.4.6"
+  "version": "2.0.0"
 }

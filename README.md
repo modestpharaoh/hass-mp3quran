@@ -92,7 +92,21 @@ target:
   entity_id: media_player.living_room
 ```
 
-`mp3quran.previous_surah` plays the previous surah in that moshaf. Both keep the session’s repeat count and auto-advance setting. They stop at the first and last available surah.
+`mp3quran.previous_surah` plays the previous surah in that moshaf. Both keep the session’s repeat count and auto-advance setting. Previous stops at the first available surah. Next stops at the last one unless loop is on.
+
+Change loop, auto-advance, or the repeat count on a session that is already playing:
+
+```yaml
+action: mp3quran.update_session
+target:
+  entity_id: media_player.living_room
+data:
+  auto_advance: true
+  loop: true
+  surah_repeat: 3
+```
+
+The current audio keeps playing. The new repeat count applies to the surah that is already playing and to the surahs after it.
 
 ### Session status
 
@@ -116,7 +130,7 @@ auto_advance: false
 loop: false
 ```
 
-Every field except `type` is an optional starting value. The card shows the MP3 Quran icon, the current surah, and the reciter and moshaf above the media player selector. While the player is playing or paused and reports track progress, the card shows the elapsed time, the duration, and a progress bar. Dragging the bar seeks when that player supports seek. Players that do not report progress, such as many ESPHome speakers, keep the bar hidden. You can set that player’s volume, then choose the reciter, moshaf (only when that reciter has more than one), starting surah, repeat count, whether to advance, and whether to loop back to the first surah after the last one. Loop is off unless you turn it on. **Play** calls `mp3quran.play`. **Stop** calls `mp3quran.stop`. In the track panel, **Pause** and **Resume** call the media player when it supports them, and the previous and next buttons call `mp3quran.previous_surah` and `mp3quran.next_surah` for the active session. Names follow the integration display language, and favorite reciters stay at the top. While that player has a session, the surah and reciter lines follow the active session.
+Every field except `type` is an optional starting value. The card language follows the integration display language, Arabic or English, rather than the Home Assistant language. It shows the MP3 Quran icon, the current surah, and the reciter and moshaf. While the player is playing or paused and reports track progress, the card shows the elapsed time, the duration, and a progress bar. Dragging the bar seeks when that player supports seek. Players that do not report progress, such as many ESPHome speakers, keep the bar hidden. Playback settings (auto-advance and loop) sit above the media player. Below that are the player, volume, reciter, moshaf (only when that reciter has more than one), surah, and repeat count. While a session is running, those three selectors show the session’s reciter, moshaf, and surah, and the settings show the session’s loop, auto-advance, and repeat count. Changing those settings calls `mp3quran.update_session` and does not restart the audio. When the session ends, the selectors return to the values saved on the card. **Play** calls `mp3quran.play`. **Stop** calls `mp3quran.stop`. In the track panel, **Pause** and **Resume** call the media player when it supports them, and the previous and next buttons call `mp3quran.previous_surah` and `mp3quran.next_surah` for the active session. Names follow the integration display language, and favorite reciters stay at the top.
 
 ### Metadata
 
@@ -155,6 +169,14 @@ actions:
 ```
 
 ## Changelog
+
+### 2.0.0
+
+- The dashboard card uses the newer playback layout: auto-advance and loop are toggle chips, Stop comes before Play, and the media player, volume, reciter, moshaf, surah, and repeat count follow. The surah field is labeled Surah / السورة.
+- The card follows the integration display language, including right-to-left layout in Arabic, instead of the Home Assistant language.
+- Reciter, moshaf, and surah selectors follow the active session, and return to the values saved on the card when that session ends.
+- Changing loop, auto-advance, or the repeat count updates the current session through `mp3quran.update_session` without restarting playback. The new repeat count applies to the surah already playing.
+- The integration is listed for the HACS catalog as a music and radio service.
 
 ### 1.4.6
 

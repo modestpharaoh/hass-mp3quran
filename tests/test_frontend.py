@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,9 @@ from custom_components.mp3quran.const import CARD_URL
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.core import HomeAssistant
 
-CARD_RESOURCE = f"{CARD_URL}?v=1.4.6"
+_MANIFEST = Path(__file__).parents[1] / "custom_components" / "mp3quran" / "manifest.json"
+_VERSION = json.loads(_MANIFEST.read_text(encoding="utf-8"))["version"]
+CARD_RESOURCE = f"{CARD_URL}?v={_VERSION}"
 
 
 def _run_tasks(hass: HomeAssistant) -> None:

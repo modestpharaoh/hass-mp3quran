@@ -1,0 +1,21 @@
+---
+description: MP3 Quran integration conventions
+alwaysApply: true
+---
+
+# MP3 Quran
+
+Home Assistant integration, domain `mp3quran`. Full guide: AGENTS.md. Behavior: README.md.
+
+- Run `.venv/bin/python -m pytest tests/ -q` from this repo. Do not use another project's virtualenv.
+- Manifest keys are `domain`, `name`, then alphabetical. Dependencies include `http` and `media_source`. `after_dependencies` is `lovelace`.
+- Register the card only after Home Assistant is running. The resource is `/mp3quran/mp3quran-card.js?v={manifest version}`. Keep the frontend test on that string.
+- The card language is the integration display language. Arabic is right-to-left. The surah field label is "Surah" / "السورة".
+- Favorites sort first. One moshaf hides that selector. Incomplete moshafs walk `surah_list`.
+- Loop and auto-advance default off. Loop wraps to the first available surah only after the last one. Previous never wraps.
+- `mp3quran.update_session` changes loop, auto-advance, or repeat without restarting audio. A new repeat sets `plays_remaining` too.
+- Pause sets `user_interrupted`. Resume clears it before the stop-service check. Seek is feature bit 2. Hide the bar when position or duration is missing.
+- Selectors follow the active session and return to the card config when it ends. Do not write those values back into Lovelace.
+- `play_media` sends only Cast metadata, then retries without `extra`. Clear the playlist before every play.
+- Do not open brand images or `docs/*.png` unless asked.
+- Commit only when the user asks. Bump `manifest.json` only for a user-facing change.

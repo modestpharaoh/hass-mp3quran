@@ -139,3 +139,44 @@ async def test_stop_handler_stops_media(hass) -> None:
     )
     assert sessions.get_session("media_player.living_room") is None
     assert hass.services.async_call.await_args.args[1] == "media_stop"
+
+
+@pytest.mark.asyncio
+async def test_update_session_handler_keeps_playback(hass) -> None:
+    sessions, play_handler, _ = _setup(hass)
+    await play_handler(
+        SimpleNamespace(
+            data={
+                "entity_id": "media_player.living_room",
+                "reciter_id": 5,
+                "surah": 1,
+                "surah_repeat": 2,
+            }
+        )
+    )
+    hass.services.async_call.reset_mock()
+    handlers = {
+        call.args[1]: call.args[2] for call in hass.services.async_register.call_args_list
+    }
+    await handlers["update_session"](
+        SimpleNamespace(
+            data={
+                "entity_id": "media_player.living_room",
+                "auto_advance": True,
+                "loop": True,
+                "surah_repeat": 4,
+            }
+        )
+    )
+    session = sessions.get_session("media_player.living_room")
+    assert session.surah == 1
+    assert session.auto_advance is True
+    assert session.loop is True
+    assert session.surah_repeat == 4
+    assert session.plays_remaining == 4
+    hass.services.async_call.assert_not_awaited()
+
+    with pytest.raises(HomeAssistantError, match="No active"):
+        await handlers["update_session"](
+            SimpleNamespace(data={"entity_id": "media_player.other", "loop": False})
+        )

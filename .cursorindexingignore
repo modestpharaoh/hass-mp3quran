@@ -1,0 +1,7 @@
+# Cursor indexing ignore
+.venv/
+.pytest_cache/
+__pycache__/
+
+custom_components/mp3quran/**/*.png
+docs/*.png

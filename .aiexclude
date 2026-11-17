@@ -1,0 +1,9 @@
+# Gemini Code Assist context exclusion. Git still tracks the images.
+.venv/
+.pytest_cache/
+__pycache__/
+.env
+.env.*
+
+custom_components/mp3quran/**/*.png
+docs/*.png

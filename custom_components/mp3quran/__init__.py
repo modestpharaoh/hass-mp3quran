@@ -40,13 +40,22 @@ type Mp3QuranConfigEntry = ConfigEntry[Mp3QuranRuntimeData]
 
 _STATIC_READY = "static_ready"
 _CARD_RESOURCE_READY = "card_resource_ready"
+_CARD_VERSION: str | None = None
 
 
-def _card_url() -> str:
-    """Return the card URL, including the integration version for cache busting."""
+def _read_manifest_version() -> str:
+    """Read the integration version from disk."""
     root = Path(__file__).parent
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    return f"{CARD_URL}?v={manifest['version']}"
+    return str(manifest["version"])
+
+
+async def _card_url(hass: HomeAssistant) -> str:
+    """Return the card URL, including the integration version for cache busting."""
+    global _CARD_VERSION
+    if _CARD_VERSION is None:
+        _CARD_VERSION = await hass.async_add_executor_job(_read_manifest_version)
+    return f"{CARD_URL}?v={_CARD_VERSION}"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -103,7 +112,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     if domain_data.get(_CARD_RESOURCE_READY):
         return
 
-    card_url = _card_url()
+    card_url = await _card_url(hass)
     lovelace = hass.data.get("lovelace")
     resources = getattr(lovelace, "resources", None)
     if getattr(lovelace, "resource_mode", None) != "storage" or resources is None:
