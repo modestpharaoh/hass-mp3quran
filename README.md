@@ -170,11 +170,13 @@ actions:
 
 ## Changelog
 
-### 1.4.7
+### 2.0.0
 
-- The dashboard card follows the integration display language, including right-to-left layout in Arabic.
-- Reciter, moshaf, and surah selectors follow the active session, and return to the card’s saved values when that session ends.
-- Changing loop, auto-advance, or the repeat count updates the current session through `mp3quran.update_session` without restarting playback.
+- The dashboard card uses the newer playback layout: auto-advance and loop are toggle chips, Stop comes before Play, and the media player, volume, reciter, moshaf, surah, and repeat count follow. The surah field is labeled Surah / السورة.
+- The card follows the integration display language, including right-to-left layout in Arabic, instead of the Home Assistant language.
+- Reciter, moshaf, and surah selectors follow the active session, and return to the values saved on the card when that session ends.
+- Changing loop, auto-advance, or the repeat count updates the current session through `mp3quran.update_session` without restarting playback. The new repeat count applies to the surah already playing.
+- The integration is listed for the HACS catalog as a music and radio service.
 
 ### 1.4.6
 

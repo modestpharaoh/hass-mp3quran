@@ -19,7 +19,7 @@ Do not use another project's virtualenv. Home Assistant itself is stubbed in `te
 ## Invariants
 
 - Manifest keys are `domain`, `name`, then alphabetical. `after_dependencies` is `lovelace`. `dependencies` includes `http` and `media_source`. Hassfest fails if that order changes.
-- The card resource is `/mp3quran/mp3quran-card.js?v={manifest version}`. Register it only after `CoreState.running` or `homeassistant_started`. Do not use `hass.is_running`. `tests/test_frontend.py` must use the same version string.
+- The card resource is `/mp3quran/mp3quran-card.js?v={manifest version}`. Register it only after `CoreState.running` or `homeassistant_started`. Do not use `hass.is_running`. `tests/test_frontend.py` reads the version from `manifest.json` instead of hardcoding it.
 - Bump `manifest.json` only when a user-facing change ships. Keep every released changelog section, including 1.4.5.
 - Display language is the integration option `english` or `arabic`, exposed as `display_language` on `sensor.mp3quran_active_sessions`. The card uses that, with Arabic right-to-left. It falls back to the Home Assistant locale only when the sensor is missing. The surah field label is "Surah" / "السورة".
 - Favorite reciters sort first and keep the star. A reciter with one moshaf hides the moshaf control. Incomplete moshafs walk `surah_list`; they do not use surah number plus or minus one.
